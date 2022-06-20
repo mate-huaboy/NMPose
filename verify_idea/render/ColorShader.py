@@ -4,9 +4,9 @@ from pytorch3d.renderer.blending import softmax_rgb_blend, BlendParams
 from pytorch3d.renderer.materials import Materials
 from pytorch3d.renderer.lighting import PointLights
 from pytorch3d.ops import interpolate_face_attributes
-import datetime
+
 def normal_shading(
-    meshes, fragments, #lights, cameras, materials, texels
+    meshes, fragments, lights, cameras, materials, texels
 ) -> torch.Tensor:
     """
     Apply per pixel shading. First interpolate the vertex normals and
@@ -88,42 +88,37 @@ class NormalShader(nn.Module):
     """
 
     def __init__(
-        self, device="cuda", cameras=None, lights=None, materials=None, blend_params=None
+        self, device="cpu", cameras=None, lights=None, materials=None, blend_params=None
     ):
         super().__init__()
-        # self.lights = lights if lights is not None else PointLights(device=device)
-        # self.materials = (
-        #     materials if materials is not None else Materials(device=device)
-        # )
+        self.lights = lights if lights is not None else PointLights(device=device)
+        self.materials = (
+            materials if materials is not None else Materials(device=device)
+        )
         self.cameras = cameras
         self.blend_params = blend_params if blend_params is not None else BlendParams()
 
     def forward(self, fragments, meshes, **kwargs) -> torch.Tensor:
-        # cameras = kwargs.get("cameras", self.cameras)#里面有光栅化的结果，光速化给shader的结果见文档，具体有四个
-        # if cameras is None:
-        #     msg = "Cameras must be specified either at initialization \
-        #         or in the forward pass of SoftPhongShader"
-        #     raise ValueError(msg)
+        cameras = kwargs.get("cameras", self.cameras)#里面有光栅化的结果，光速化给shader的结果见文档，具体有四个
+        if cameras is None:
+            msg = "Cameras must be specified either at initialization \
+                or in the forward pass of SoftPhongShader"
+            raise ValueError(msg)
 
         # texels = meshes.sample_textures(fragments)
         texels = None
 
-        # lights = kwargs.get("lights", self.lights)
+        lights = kwargs.get("lights", self.lights)
 
-        # materials = kwargs.get("materials", self.materials)
-        # s= datetime.datetime.now()
+        materials = kwargs.get("materials", self.materials)
         blend_params = kwargs.get("blend_params", self.blend_params)
         colors = normal_shading(
             meshes=meshes,
             fragments=fragments,
-            # texels=texels,
-            # lights=lights,
-            # cameras=cameras,
-            # materials=materials,
+            texels=texels,
+            lights=lights,
+            cameras=cameras,
+            materials=materials,
         )
-       
         images = softmax_rgb_blend(colors, fragments, blend_params)
-        # e=datetime.datetime.now()
-        # print((e-s).microseconds)
         return images
-

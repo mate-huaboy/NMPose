@@ -11,8 +11,7 @@ import ref
 from lib.meshrenderer.meshrenderer_phong_normals import Renderer
 import numpy as np
 from core.utils.pose_utils import quat2mat_torch
-from losses.diff_render.diffrenderNormal import DiffRenderer_Normal_Wrapper
-# from verify_idea.render.diffrenderNormal import DiffRenderer_Normal_Wrapper
+from core.gdrn_modeling.losses.diff_render.diffrenderNormal  import DiffRenderer_Normal_Wrapper
 cur_dir = osp.abspath(osp.dirname(__file__))
 PROJ_ROOT = osp.join(cur_dir, "../..")
 sys.path.insert(0, PROJ_ROOT)
@@ -36,8 +35,8 @@ idx2class = {
 }
 
 class2idx = {_name: _id for _id, _name in idx2class.items()}#gen a  dictionary
-IM_H = 480
-IM_W = 640
+IM_H = 64
+IM_W = 64
 class PyrotLoss:
     """Point matching loss."""
 
@@ -113,7 +112,7 @@ class PyrotLoss:
         #             PROJ_ROOT, ".cache")
         #     )
         self.renderer[dataset_name]=DiffRenderer_Normal_Wrapper(
-            model_paths,device=self.device, render_image_size=(IM_H,IM_W)
+            model_paths,device=self.device
         )
         self.renderer[dataset_name].cls2idx = class2idx #这里可能有错误或者需要修改
 
@@ -138,30 +137,14 @@ class PyrotLoss:
         #===============
         #===========为每个选择增加一列和一行以表示变换矩阵
         # start=datetime.datetime.now()
-#         K = np.array([[572.4114, 0, 325.2611], [0, 573.57043, 242.04899], [0, 0, 1]])  #这里可能要改
-#         R = torch.tensor(
-#     [
-#         [0.66307002, 0.74850100, 0.00921593],
-#         [0.50728703, -0.44026601, -0.74082798],
-#         [-0.55045301, 0.49589601, -0.67163098],
-#     ],
-#     dtype=torch.float32,
-#     device="cuda:0"
-# )
-#         R=R.reshape(1,3,3)
-#         R=R.repeat(2,1,1)
-#         # T = torch.tensor([42.36749640, 1.84263252, 768.28001229], dtype=torch.float32,device="cuda:0") / 1000
-#         K=torch.tensor(K, dtype=torch.float32,).reshape(1,3,3)
-#         K=K.repeat(2,1,1)
-        img_normal=self.renderer[dataset_name](cla,pred_rots,gt_rots,roi_cams,(IM_H,IM_W))#找到原因了，是这个IM_H和IM_W的原因
-        # img_normal=self.renderer[dataset_name]((1,2),R,R,K,(480,640))
+        img_normal=self.renderer[dataset_name](cla,pred_rots,gt_rots,roi_cams,(IM_H,IM_W))
         img_normal_pre=img_normal[:24]
         img_normal_gt=img_normal[24:]
-        # pre_i=img_normal_pre[0].detach().cpu().numpy()*255
-        # gt_i=img_normal_gt[0].detach().cpu().numpy()*255
+        pre_i=img_normal_pre[0].detach().cpu().numpy()*255
+        gt_i=img_normal_gt[0].detach().cpu().numpy()*255
 
-        # cv2.imwrite("a.png",pre_i)
-        # cv2.imwrite("b.png",gt_i)
+        cv2.imwrite("a.png",pre_i)
+        cv2.imwrite("b.png",gt_i)
 
                
 

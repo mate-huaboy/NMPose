@@ -752,8 +752,10 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
             raise ValueError(f"Unknown rot type: {pnp_net_cfg.ROT_TYPE}")
         dataset_dict["ego_rot"] = torch.as_tensor(pose[:3, :3].astype("float32"))
         dataset_dict["trans"] = torch.as_tensor(inst_infos["trans"].astype("float32"))# 获取平移--单位mm
-
-        dataset_dict["roi_points"] = torch.as_tensor(self._get_model_points(dataset_name)[roi_cls].astype("float32"))
+        if pnp_net_cfg.PM_LOSS_TYPE!="normal_loss":
+            dataset_dict["roi_points"] = torch.as_tensor(self._get_model_points(dataset_name)[roi_cls].astype("float32"))
+        else:
+            dataset_dict["roi_points"]=None
         dataset_dict["sym_info"] = self._get_sym_infos(dataset_name)[roi_cls]
 
         dataset_dict["roi_img"] = torch.as_tensor(roi_img.astype("float32")).contiguous()

@@ -56,8 +56,9 @@ class GDRN(nn.Module):
         self.l=np.array([[0,0,1]])
         self.rot_normalLoss=PyrotLoss()
         #建议在这里创建一个render?
-        for dataset_name in cfg.DATASETS.TRAIN:
-            self.rot_normalLoss.add_dataset_name(dataset_name)
+        # for dataset_name in cfg.DATASETS.TRAIN:
+        #     self.rot_normalLoss.add_dataset_name(dataset_name)
+        self.rot_normalLoss.add_dataset_name( cfg.DATASETS.TRAIN[0])
 
         #
 
@@ -240,9 +241,12 @@ class GDRN(nn.Module):
                 # grid=F.affine_grid(Ms,(24,3,64,64))
 
                 coor_feat1=F.grid_sample(coor_feat,grid)
+                #好像真实的nxyz也应该移到中心
+
                 # coor_feat1=F.normalize(coor_feat1,p=2,dim=1)
 
-                # cv2.imwrite("a.png",coor_feat1[0].cpu().numpy().transpose(1,2,0)*255)
+                cv2.imwrite("trans_after.png",coor_feat1[0].cpu().numpy().transpose(1,2,0)*255)
+                cv2.imwrite("gt_nxyz.png",gt_xyz[0].cpu().numpy().transpose(1,2,0)*255)
                 # roi_nxyz=coor_feat1[0].cpu().numpy().transpose(1,2,0) 
                 # print(np.linalg.norm(np.array([roi_nxyz[34][30][0],roi_nxyz[34][30][1],roi_nxyz[34][30][2]])))
                 # aa=np.linalg.norm(roi_nxyz,axis=2)
@@ -466,6 +470,8 @@ class GDRN(nn.Module):
                 sym_infos=sym_infos,
                 extents=roi_extents,
                 roi_classes=roi_classes,
+
+
                 roi_cams=roi_cams,
             )
 
@@ -550,10 +556,12 @@ class GDRN(nn.Module):
                 ) / gt_mask_xyz.sum().float().clamp(min=1.0)
             elif xyz_loss_type=="Cos_smi":
                 #求余弦相似度的相反数的和作为损失函数
+
                 coor_feat = torch.cat([out_x, out_y, out_z], dim=1)
                 #归一化
                 # coor_feat=F.normalize(coor_feat,p=2,dim=1)
                 cos_simi=1-F.cosine_similarity(coor_feat,gt_xyz,dim=1)
+                cos_simi=cos_simi*gt_mask_xyz#需要乘以mask
                 loss_dict["loss_coor"]=cos_simi.sum()/gt_mask_xyz.sum().float().clamp(min=1.0)  #
                 
                 
@@ -635,33 +643,36 @@ class GDRN(nn.Module):
             # )
 
         if pnp_net_cfg.PM_LW > 0:
-            assert (gt_points is not None) and (gt_trans is not None) and (gt_rot is not None)
-            self.rot_normalLoss.get_rot_normal_loss(out_rot,gt_rot,roi_classes,None,roi_cams)
-            loss_func = PyPMLoss(#看这里的误差计算,融合预测旋转和平移是还包括了平移在3d点上的 误差评估？
-                loss_type=pnp_net_cfg.PM_LOSS_TYPE,
-                beta=pnp_net_cfg.PM_SMOOTH_L1_BETA,
-                reduction="mean",
-                loss_weight=pnp_net_cfg.PM_LW,
-                norm_by_extent=pnp_net_cfg.PM_NORM_BY_EXTENT,
-                symmetric=pnp_net_cfg.PM_LOSS_SYM,
-                disentangle_t=pnp_net_cfg.PM_DISENTANGLE_T,
-                disentangle_z=pnp_net_cfg.PM_DISENTANGLE_Z,
-                t_loss_use_points=pnp_net_cfg.PM_T_USE_POINTS,
-                r_only=pnp_net_cfg.PM_R_ONLY,
-            )
-            loss_pm_dict = loss_func(
-                pred_rots=out_rot,
-                gt_rots=gt_rot,
-                points=gt_points,
-                pred_transes=out_trans,
-                gt_transes=gt_trans,
-                extents=extents,
-                sym_infos=sym_infos,
-            )
+            
+            if pnp_net_cfg.PM_LOSS_TYPE=="normal_loss":
+                loss_pm_dict= self.rot_normalLoss.get_rot_normal_loss(out_rot,gt_rot,roi_classes,None,roi_cams)
+            else:
+                assert (gt_points is not None) and (gt_trans is not None) and (gt_rot is not None)
+                loss_func = PyPMLoss(#看这里的误差计算,融合预测旋转和平移是还包括了平移在3d点上的 误差评估？
+                    loss_type=pnp_net_cfg.PM_LOSS_TYPE,
+                    beta=pnp_net_cfg.PM_SMOOTH_L1_BETA,
+                    reduction="mean",
+                    loss_weight=pnp_net_cfg.PM_LW,
+                    norm_by_extent=pnp_net_cfg.PM_NORM_BY_EXTENT,
+                    symmetric=pnp_net_cfg.PM_LOSS_SYM,
+                    disentangle_t=pnp_net_cfg.PM_DISENTANGLE_T,
+                    disentangle_z=pnp_net_cfg.PM_DISENTANGLE_Z,
+                    t_loss_use_points=pnp_net_cfg.PM_T_USE_POINTS,
+                    r_only=pnp_net_cfg.PM_R_ONLY,
+                )
+                loss_pm_dict = loss_func(
+                    pred_rots=out_rot,
+                    gt_rots=gt_rot,
+                    points=gt_points,
+                    pred_transes=out_trans,
+                    gt_transes=gt_trans,
+                    extents=extents,
+                    sym_infos=sym_infos,
+                )
             loss_dict.update(loss_pm_dict)#向字典中加入字典
 
         # rot_loss ----------
-        if pnp_net_cfg.ROT_LW > 0:#这样无法解决对称问题
+        if pnp_net_cfg.ROT_LW > 0:#这样无法解决对称问题,但是看论文没有这一部分损失函数啊,并没有使用
             if pnp_net_cfg.ROT_LOSS_TYPE == "angular":
                 loss_dict["loss_rot"] = angular_distance(out_rot, gt_rot)
             elif pnp_net_cfg.ROT_LOSS_TYPE == "L2":

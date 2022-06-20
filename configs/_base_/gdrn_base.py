@@ -90,7 +90,9 @@ MODEL = dict(
             Z_TYPE="REL",  # REL | ABS | LOG | NEG_LOG  (only valid for centroid_z)
             # point matching loss
             NUM_PM_POINTS=3000,
-            PM_LOSS_TYPE="L1",  # L1 | Smooth_L1
+            # PM_LOSS_TYPE="L1",  # L1 | Smooth_L1|normal_loss
+            PM_LOSS_TYPE="normal_loss",  # L1 | Smooth_L1|normal_loss
+
             PM_SMOOTH_L1_BETA=1.0,
             PM_LOSS_SYM=False,  # use symmetric PM loss
             PM_NORM_BY_EXTENT=False,  # 10. / extent.max(1, keepdim=True)[0]

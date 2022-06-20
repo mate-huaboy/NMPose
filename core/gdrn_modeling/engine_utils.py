@@ -30,7 +30,7 @@ def batch_data(cfg, data, device="cuda", phase="train"):#get data by wenhua
 
     batch["roi_trans_ratio"] = torch.stack([d["trans_ratio"] for d in data], dim=0).to(device, non_blocking=True)
     # yapf: disable
-    for key in [
+    keys_list= [
         "roi_xyz",
         "roi_xyz_bin",
         "roi_mask_trunc",
@@ -43,9 +43,12 @@ def batch_data(cfg, data, device="cuda", phase="train"):#get data by wenhua
         "allo_rot6d",
         "ego_rot",
         "trans",
-        "roi_points",
+        # "roi_points",
         "roi_nxyz",
-    ]:
+    ]
+    if cfg.MODEL.CDPN.PNP_NET.PM_LOSS_TYPE!="normal_loss":
+        keys_list.append("roi_points")
+    for key in keys_list:
         if key in data[0]:
             if key in ["roi_region"]:
                 dtype = torch.long

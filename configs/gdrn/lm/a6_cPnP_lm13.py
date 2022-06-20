@@ -82,6 +82,7 @@ MODEL = dict(
             CENTROID_LW=1.0,
             Z_LOSS_TYPE="L1",
             Z_LW=1.0,
+           
         ),
         TRANS_HEAD=dict(FREEZE=True),
         # TRANS_HEAD=dict(FREEZE=False),
