@@ -206,7 +206,7 @@ class GDRN_Lite(LightningLite):
         start_iter = checkpointer.resume_or_load(cfg.MODEL.WEIGHTS, resume=resume).get("iteration", -1) + 1
 
         #如果是最新的训练则从0开始
-        start_iter=0
+        # start_iter=0
         if cfg.SOLVER.CHECKPOINT_BY_EPOCH:
             ckpt_period = cfg.SOLVER.CHECKPOINT_PERIOD * iters_per_epoch
         else:

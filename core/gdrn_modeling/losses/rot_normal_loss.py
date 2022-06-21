@@ -38,8 +38,8 @@ idx2class = {
 }
 
 class2idx = {_name: _id for _id, _name in idx2class.items()}#gen a  dictionary
-IM_H = 480
-IM_W = 640
+IM_H = 128
+IM_W = 128
 class PyrotLoss:
     """Point matching loss."""
 
@@ -181,11 +181,15 @@ class PyrotLoss:
         # img_normal_pre=img_normal_pre[:,...,:3]
         # img_normal_gt=torch.squeeze(img_normal_gt)
 
-        cos_simi=1-F.cosine_similarity(img_normal_pre,img_normal_gt,dim=3)
+        # cos_simi=1-F.cosine_similarity(img_normal_pre,img_normal_gt,dim=3)
+        cos_simi=F.cosine_similarity(img_normal_pre,img_normal_gt,dim=3)
+
         # loss_dict["loss_coor"]=cos_simi.sum()/gt_mask_xyz.sum().float().clamp(min=1.0)
         #=====================
         cos_simi=mask*cos_simi
-        loss_dict ={"loss_rot_normal":cos_simi.sum()/mask.sum()}
+        cos_simi=cos_simi.sum()/mask.sum()
+        cos_simi=cos_simi.arccos()
+        loss_dict ={"loss_rot_normal":cos_simi}
         # endtime3=datetime.datetime.now()
         # print((endtime3-endtime2).microseconds)
 

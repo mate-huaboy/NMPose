@@ -105,7 +105,7 @@ DATALOADER = dict(
 # ---------------------------------------------------------------------------- #
 SOLVER = dict(
     IMS_PER_BATCH=6,
-    TOTAL_EPOCHS=180,#修改之前160
+    TOTAL_EPOCHS=120,#修改之前160
     # TOTAL_EPOCHS=200,#修改之前
 
     # NOTE: use string code to get cfg dict like mmdet

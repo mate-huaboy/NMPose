@@ -91,8 +91,12 @@ class DiffRender(nn.Module):
         t=t.reshape(1,3)
         t=t.repeat(B,1)
       
+        # cameras = PerspectiveCameras(R=R,T=t,focal_length=torch.stack([K[:, 0, 0], K[:, 1, 1]], dim=-1),
+        #                              principal_point=K[:, :2, 2], image_size=[render_image_size] * B, in_ndc=False,
+        #                              device=device)# why not use R and t
+        principal_p=(render_image_size[0]/2,render_image_size[1]/2)
         cameras = PerspectiveCameras(R=R,T=t,focal_length=torch.stack([K[:, 0, 0], K[:, 1, 1]], dim=-1),
-                                     principal_point=K[:, :2, 2], image_size=[render_image_size] * B, in_ndc=False,
+                                     principal_point=[principal_p] * B, image_size=[render_image_size] * B, in_ndc=False,
                                      device=device)# why not use R and t
        
         target_images = self.renderer(mesh, cameras=cameras,blendParams=self.blend_params) #1*480*640*4

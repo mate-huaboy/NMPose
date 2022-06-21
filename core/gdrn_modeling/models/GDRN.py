@@ -246,7 +246,7 @@ class GDRN(nn.Module):
                 # coor_feat1=F.normalize(coor_feat1,p=2,dim=1)
 
                 cv2.imwrite("trans_after.png",coor_feat1[0].cpu().numpy().transpose(1,2,0)*255)
-                cv2.imwrite("gt_nxyz.png",gt_xyz[0].cpu().numpy().transpose(1,2,0)*255)
+                # cv2.imwrite("gt_nxyz.png",gt_xyz[0].cpu().numpy().transpose(1,2,0)*255)
                 # roi_nxyz=coor_feat1[0].cpu().numpy().transpose(1,2,0) 
                 # print(np.linalg.norm(np.array([roi_nxyz[34][30][0],roi_nxyz[34][30][1],roi_nxyz[34][30][2]])))
                 # aa=np.linalg.norm(roi_nxyz,axis=2)
