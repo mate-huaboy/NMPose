@@ -177,7 +177,7 @@ class GDRN(nn.Module):
          #first eti translate
         device = x.device
         pred_t_only = self.trans_head_net(features)
-        if pnp_net_cfg.R_ONLY and pnp_net_cfg.CENTER_TRANS:  # override trans pred,fisrt step need not run 
+        if pnp_net_cfg.R_ONLY and pnp_net_cfg.CENTER_TRANS and pnp_net_cfg.ENABLE:  # override trans pred,fisrt step need not run 
             with torch.no_grad():
                
 
@@ -211,7 +211,7 @@ class GDRN(nn.Module):
                 # yy2=(coor_feat[:,1]*gt_mask_visib[:,None][:,0])[:,None]
                 # yy3=(coor_feat[:,2]*gt_mask_visib[:,None][:,0])[:,None]
                 coor_feat = torch.cat([yy1, yy2, yy3], dim=1)
-                coor_feat=F.normalize(coor_feat,p=2,dim=1)
+                # coor_feat=F.normalize(coor_feat,p=2,dim=1)
 
 
                 pred_trans_temp=pred_trans_temp.cpu().numpy()
@@ -352,28 +352,33 @@ class GDRN(nn.Module):
         #     coor_feat, region=region_atten, extents=roi_extents, mask_attention=mask_atten
         # )
         #修改为中心的移动
-        pred_rot_, pred_t_ = self.pnp_net(
-            coor_feat1, region=region_atten, extents=roi_extents, mask_attention=mask_atten
-        )
+        if  pnp_net_cfg.ENABLE:
+            pred_rot_, pred_t_ = self.pnp_net(
+                coor_feat1, region=region_atten, extents=roi_extents, mask_attention=mask_atten
+            )
+        
+        
+
+        
+
+            # convert pred_rot to rot mat -------------------------
+            rot_type = pnp_net_cfg.ROT_TYPE
+            if rot_type in ["ego_quat", "allo_quat"]:
+                pred_rot_m = quat2mat_torch(pred_rot_)
+            elif rot_type in ["ego_log_quat", "allo_log_quat"]:
+                pred_rot_m = quat2mat_torch(quaternion_lf.qexp(pred_rot_))
+            elif rot_type in ["ego_lie_vec", "allo_lie_vec"]:
+                pred_rot_m = lie_algebra.lie_vec_to_rot(pred_rot_)
+            elif rot_type in ["ego_rot6d", "allo_rot6d"]:
+                pred_rot_m = ortho6d_to_mat_batch(pred_rot_)
+            else:
+                raise RuntimeError(f"Wrong pred_rot_ dim: {pred_rot_.shape}")
         if pnp_net_cfg.R_ONLY:  # override trans pred
             pred_t_=pred_t_only
-        
-
-        
-
-        # convert pred_rot to rot mat -------------------------
-        rot_type = pnp_net_cfg.ROT_TYPE
-        if rot_type in ["ego_quat", "allo_quat"]:
-            pred_rot_m = quat2mat_torch(pred_rot_)
-        elif rot_type in ["ego_log_quat", "allo_log_quat"]:
-            pred_rot_m = quat2mat_torch(quaternion_lf.qexp(pred_rot_))
-        elif rot_type in ["ego_lie_vec", "allo_lie_vec"]:
-            pred_rot_m = lie_algebra.lie_vec_to_rot(pred_rot_)
-        elif rot_type in ["ego_rot6d", "allo_rot6d"]:
-            pred_rot_m = ortho6d_to_mat_batch(pred_rot_)
-        else:
-            raise RuntimeError(f"Wrong pred_rot_ dim: {pred_rot_.shape}")
         # convert pred_rot_m and pred_t to ego pose -----------------------------
+        #应该分开得到旋转和平移，因为有可能此时旋转都没有得到
+        if not pnp_net_cfg.ENABLE:
+                pred_rot_m=None
         if pnp_net_cfg.TRANS_TYPE == "centroid_z":
             pred_ego_rot, pred_trans = pose_from_pred_centroid_z(
                 pred_rot_m,
@@ -561,7 +566,7 @@ class GDRN(nn.Module):
                 #归一化
                 # coor_feat=F.normalize(coor_feat,p=2,dim=1)
                 cos_simi=1-F.cosine_similarity(coor_feat,gt_xyz,dim=1)
-                cos_simi=cos_simi*gt_mask_xyz#需要乘以mask
+                cos_simi=cos_simi*gt_mask_xyz#需要乘以mask（刚加上，但还未验证）
                 loss_dict["loss_coor"]=cos_simi.sum()/gt_mask_xyz.sum().float().clamp(min=1.0)  #
                 
                 
@@ -641,45 +646,45 @@ class GDRN(nn.Module):
         #Renderer(
             #     model_paths, vertex_tmp_store_folder=osp.join(PROJ_ROOT, ".cache")
             # )
+        if pnp_net_cfg.ENABLE and not pnp_net_cfg.FREEZE:
+            if pnp_net_cfg.PM_LW > 0:
+                
+                if pnp_net_cfg.PM_LOSS_TYPE=="normal_loss":
+                    loss_pm_dict= self.rot_normalLoss.get_rot_normal_loss(out_rot,gt_rot,roi_classes,None,roi_cams)
+                else:
+                    assert (gt_points is not None) and (gt_trans is not None) and (gt_rot is not None)
+                    loss_func = PyPMLoss(#看这里的误差计算,融合预测旋转和平移是还包括了平移在3d点上的 误差评估？
+                        loss_type=pnp_net_cfg.PM_LOSS_TYPE,
+                        beta=pnp_net_cfg.PM_SMOOTH_L1_BETA,
+                        reduction="mean",
+                        loss_weight=pnp_net_cfg.PM_LW,
+                        norm_by_extent=pnp_net_cfg.PM_NORM_BY_EXTENT,
+                        symmetric=pnp_net_cfg.PM_LOSS_SYM,
+                        disentangle_t=pnp_net_cfg.PM_DISENTANGLE_T,
+                        disentangle_z=pnp_net_cfg.PM_DISENTANGLE_Z,
+                        t_loss_use_points=pnp_net_cfg.PM_T_USE_POINTS,
+                        r_only=pnp_net_cfg.PM_R_ONLY,
+                    )
+                    loss_pm_dict = loss_func(
+                        pred_rots=out_rot,
+                        gt_rots=gt_rot,
+                        points=gt_points,
+                        pred_transes=out_trans,
+                        gt_transes=gt_trans,
+                        extents=extents,
+                        sym_infos=sym_infos,
+                    )
+                loss_dict.update(loss_pm_dict)#向字典中加入字典
 
-        if pnp_net_cfg.PM_LW > 0:
-            
-            if pnp_net_cfg.PM_LOSS_TYPE=="normal_loss":
-                loss_pm_dict= self.rot_normalLoss.get_rot_normal_loss(out_rot,gt_rot,roi_classes,None,roi_cams)
-            else:
-                assert (gt_points is not None) and (gt_trans is not None) and (gt_rot is not None)
-                loss_func = PyPMLoss(#看这里的误差计算,融合预测旋转和平移是还包括了平移在3d点上的 误差评估？
-                    loss_type=pnp_net_cfg.PM_LOSS_TYPE,
-                    beta=pnp_net_cfg.PM_SMOOTH_L1_BETA,
-                    reduction="mean",
-                    loss_weight=pnp_net_cfg.PM_LW,
-                    norm_by_extent=pnp_net_cfg.PM_NORM_BY_EXTENT,
-                    symmetric=pnp_net_cfg.PM_LOSS_SYM,
-                    disentangle_t=pnp_net_cfg.PM_DISENTANGLE_T,
-                    disentangle_z=pnp_net_cfg.PM_DISENTANGLE_Z,
-                    t_loss_use_points=pnp_net_cfg.PM_T_USE_POINTS,
-                    r_only=pnp_net_cfg.PM_R_ONLY,
-                )
-                loss_pm_dict = loss_func(
-                    pred_rots=out_rot,
-                    gt_rots=gt_rot,
-                    points=gt_points,
-                    pred_transes=out_trans,
-                    gt_transes=gt_trans,
-                    extents=extents,
-                    sym_infos=sym_infos,
-                )
-            loss_dict.update(loss_pm_dict)#向字典中加入字典
-
-        # rot_loss ----------
-        if pnp_net_cfg.ROT_LW > 0:#这样无法解决对称问题,但是看论文没有这一部分损失函数啊,并没有使用
-            if pnp_net_cfg.ROT_LOSS_TYPE == "angular":
-                loss_dict["loss_rot"] = angular_distance(out_rot, gt_rot)
-            elif pnp_net_cfg.ROT_LOSS_TYPE == "L2":
-                loss_dict["loss_rot"] = rot_l2_loss(out_rot, gt_rot)
-            else:
-                raise ValueError(f"Unknown rot loss type: {pnp_net_cfg.ROT_LOSS_TYPE}")
-            loss_dict["loss_rot"] *= pnp_net_cfg.ROT_LW
+            # rot_loss ----------
+            if pnp_net_cfg.ROT_LW > 0:#这样无法解决对称问题,但是看论文没有这一部分损失函数啊,并没有使用
+                if pnp_net_cfg.ROT_LOSS_TYPE == "angular":
+                    loss_dict["loss_rot"] = angular_distance(out_rot, gt_rot)
+                elif pnp_net_cfg.ROT_LOSS_TYPE == "L2":
+                    loss_dict["loss_rot"] = rot_l2_loss(out_rot, gt_rot)
+                else:
+                    raise ValueError(f"Unknown rot loss type: {pnp_net_cfg.ROT_LOSS_TYPE}")
+                loss_dict["loss_rot"] *= pnp_net_cfg.ROT_LW
 
         # centroid loss -------------
         if pnp_net_cfg.CENTROID_LW > 0:
@@ -886,66 +891,69 @@ def build_model_optimizer(cfg):
                 )
 
         # -----------------------------------------------
-        if r_head_cfg.XYZ_LOSS_TYPE in ["CE_coor", "CE"]:
-            pnp_net_in_channel = r_out_dim - 3
+        if pnp_net_cfg.ENABLE:
+            if r_head_cfg.XYZ_LOSS_TYPE in ["CE_coor", "CE"]:
+                pnp_net_in_channel = r_out_dim - 3
+            else:
+                pnp_net_in_channel = r_out_dim
+
+            if pnp_net_cfg.WITH_2D_COORD:
+                pnp_net_in_channel += 2
+
+            if pnp_net_cfg.REGION_ATTENTION:
+                pnp_net_in_channel += r_head_cfg.NUM_REGIONS
+
+            if pnp_net_cfg.MASK_ATTENTION in ["concat"]:  # do not add dim for none/mul
+                pnp_net_in_channel += 1
+
+            if pnp_net_cfg.ROT_TYPE in ["allo_quat", "ego_quat"]:
+                rot_dim = 4
+            elif pnp_net_cfg.ROT_TYPE in ["allo_log_quat", "ego_log_quat", "allo_lie_vec", "ego_lie_vec"]:
+                rot_dim = 3
+            elif pnp_net_cfg.ROT_TYPE in ["allo_rot6d", "ego_rot6d"]:
+                rot_dim = 6
+            else:
+                raise ValueError(f"Unknown ROT_TYPE: {pnp_net_cfg.ROT_TYPE}")
+
+            pnp_head_cfg = pnp_net_cfg.PNP_HEAD_CFG
+            pnp_head_type = pnp_head_cfg.pop("type")
+            if pnp_head_type == "ConvPnPNet":
+                pnp_head_cfg.update(
+                    nIn=pnp_net_in_channel,
+                    rot_dim=rot_dim,
+                    num_regions=r_head_cfg.NUM_REGIONS,
+                    featdim=128,
+                    num_layers=3,
+                    mask_attention_type=pnp_net_cfg.MASK_ATTENTION,
+                )
+                pnp_net = ConvPnPNet(**pnp_head_cfg)
+            elif pnp_head_type == "PointPnPNet":
+                pnp_head_cfg.update(nIn=pnp_net_in_channel, rot_dim=rot_dim, num_regions=r_head_cfg.NUM_REGIONS)
+                pnp_net = PointPnPNet(**pnp_head_cfg)
+            elif pnp_head_type == "SimplePointPnPNet":
+                pnp_head_cfg.update(
+                    nIn=pnp_net_in_channel,
+                    rot_dim=rot_dim,
+                    mask_attention_type=pnp_net_cfg.MASK_ATTENTION,
+                    # num_regions=r_head_cfg.NUM_REGIONS,
+                )
+                pnp_net = SimplePointPnPNet(**pnp_head_cfg)
+            else:
+                raise ValueError(f"Unknown pnp head type: {pnp_head_type}")
+
+            if pnp_net_cfg.FREEZE:
+                for param in pnp_net.parameters():
+                    with torch.no_grad():
+                        param.requires_grad = False
+            else:
+                params_lr_list.append(
+                    {
+                        "params": filter(lambda p: p.requires_grad, pnp_net.parameters()),
+                        "lr": float(cfg.SOLVER.BASE_LR) * pnp_net_cfg.LR_MULT,
+                    }
+                )
         else:
-            pnp_net_in_channel = r_out_dim
-
-        if pnp_net_cfg.WITH_2D_COORD:
-            pnp_net_in_channel += 2
-
-        if pnp_net_cfg.REGION_ATTENTION:
-            pnp_net_in_channel += r_head_cfg.NUM_REGIONS
-
-        if pnp_net_cfg.MASK_ATTENTION in ["concat"]:  # do not add dim for none/mul
-            pnp_net_in_channel += 1
-
-        if pnp_net_cfg.ROT_TYPE in ["allo_quat", "ego_quat"]:
-            rot_dim = 4
-        elif pnp_net_cfg.ROT_TYPE in ["allo_log_quat", "ego_log_quat", "allo_lie_vec", "ego_lie_vec"]:
-            rot_dim = 3
-        elif pnp_net_cfg.ROT_TYPE in ["allo_rot6d", "ego_rot6d"]:
-            rot_dim = 6
-        else:
-            raise ValueError(f"Unknown ROT_TYPE: {pnp_net_cfg.ROT_TYPE}")
-
-        pnp_head_cfg = pnp_net_cfg.PNP_HEAD_CFG
-        pnp_head_type = pnp_head_cfg.pop("type")
-        if pnp_head_type == "ConvPnPNet":
-            pnp_head_cfg.update(
-                nIn=pnp_net_in_channel,
-                rot_dim=rot_dim,
-                num_regions=r_head_cfg.NUM_REGIONS,
-                featdim=128,
-                num_layers=3,
-                mask_attention_type=pnp_net_cfg.MASK_ATTENTION,
-            )
-            pnp_net = ConvPnPNet(**pnp_head_cfg)
-        elif pnp_head_type == "PointPnPNet":
-            pnp_head_cfg.update(nIn=pnp_net_in_channel, rot_dim=rot_dim, num_regions=r_head_cfg.NUM_REGIONS)
-            pnp_net = PointPnPNet(**pnp_head_cfg)
-        elif pnp_head_type == "SimplePointPnPNet":
-            pnp_head_cfg.update(
-                nIn=pnp_net_in_channel,
-                rot_dim=rot_dim,
-                mask_attention_type=pnp_net_cfg.MASK_ATTENTION,
-                # num_regions=r_head_cfg.NUM_REGIONS,
-            )
-            pnp_net = SimplePointPnPNet(**pnp_head_cfg)
-        else:
-            raise ValueError(f"Unknown pnp head type: {pnp_head_type}")
-
-        if pnp_net_cfg.FREEZE:
-            for param in pnp_net.parameters():
-                with torch.no_grad():
-                    param.requires_grad = False
-        else:
-            params_lr_list.append(
-                {
-                    "params": filter(lambda p: p.requires_grad, pnp_net.parameters()),
-                    "lr": float(cfg.SOLVER.BASE_LR) * pnp_net_cfg.LR_MULT,
-                }
-            )
+            pnp_net=None
         # ================================================
 
         # CDPN (Coordinates-based Disentangled Pose Network)

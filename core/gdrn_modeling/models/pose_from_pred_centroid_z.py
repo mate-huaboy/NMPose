@@ -107,37 +107,40 @@ def pose_from_predictions_test(
     # quat_allo = pred_quats / (torch.norm(pred_quats, dim=1, keepdim=True) + eps)
     # quat_ego = allocentric_to_egocentric_torch(translation, quat_allo, eps=eps)
     # use numpy since it is more accurate
-    if pred_rots.shape[-1] == 4 and pred_rots.ndim == 2:
-        pred_quats = pred_rots.detach().cpu().numpy()  # allo
-        ego_rot_preds = np.zeros((pred_quats.shape[0], 3, 3), dtype=np.float32)
-        for i in range(pred_quats.shape[0]):
-            # try:
-            if is_allo:
-                # this allows unnormalized quat
-                cur_ego_mat = allocentric_to_egocentric(
-                    RT_transform.quat_trans_to_pose_m(pred_quats[i], translation[i].detach().cpu().numpy()),
-                    src_type="mat",
-                    dst_type="mat",
-                )[:3, :3]
-            else:
-                cur_ego_mat = RT_transform.quat_trans_to_pose_m(pred_quats[i], translation[i].detach().cpu().numpy())
-            ego_rot_preds[i] = cur_ego_mat
-            # except:
+    if pred_rots is not None:
+        if pred_rots.shape[-1] == 4 and pred_rots.ndim == 2:
+            pred_quats = pred_rots.detach().cpu().numpy()  # allo
+            ego_rot_preds = np.zeros((pred_quats.shape[0], 3, 3), dtype=np.float32)
+            for i in range(pred_quats.shape[0]):
+                # try:
+                if is_allo:
+                    # this allows unnormalized quat
+                    cur_ego_mat = allocentric_to_egocentric(
+                        RT_transform.quat_trans_to_pose_m(pred_quats[i], translation[i].detach().cpu().numpy()),
+                        src_type="mat",
+                        dst_type="mat",
+                    )[:3, :3]
+                else:
+                    cur_ego_mat = RT_transform.quat_trans_to_pose_m(pred_quats[i], translation[i].detach().cpu().numpy())
+                ego_rot_preds[i] = cur_ego_mat
+                # except:
 
-    # rot mat
-    if pred_rots.shape[-1] == 3 and pred_rots.ndim == 3:
-        pred_rots = pred_rots.detach().cpu().numpy()
-        ego_rot_preds = np.zeros_like(pred_rots)
-        for i in range(pred_rots.shape[0]):
-            if is_allo:
-                cur_ego_mat = allocentric_to_egocentric(
-                    np.hstack([pred_rots[i], translation[i].detach().cpu().numpy().reshape(3, 1)]),
-                    src_type="mat",
-                    dst_type="mat",
-                )[:3, :3]
-            else:
-                cur_ego_mat = pred_rots[i]
-            ego_rot_preds[i] = cur_ego_mat
+        # rot mat
+        if pred_rots.shape[-1] == 3 and pred_rots.ndim == 3:
+            pred_rots = pred_rots.detach().cpu().numpy()
+            ego_rot_preds = np.zeros_like(pred_rots)
+            for i in range(pred_rots.shape[0]):
+                if is_allo:
+                    cur_ego_mat = allocentric_to_egocentric(
+                        np.hstack([pred_rots[i], translation[i].detach().cpu().numpy().reshape(3, 1)]),
+                        src_type="mat",
+                        dst_type="mat",
+                    )[:3, :3]
+                else:
+                    cur_ego_mat = pred_rots[i]
+                ego_rot_preds[i] = cur_ego_mat
+        else:
+            ego_rot_preds=np.array([])
     return torch.from_numpy(ego_rot_preds), translation
 
 
@@ -210,20 +213,22 @@ def pose_from_predictions_train(
         [z * (cx - roi_cams[:, 0:1, 2]) / roi_cams[:, 0:1, 0], z * (cy - roi_cams[:, 1:2, 2]) / roi_cams[:, 1:2, 1], z],
         dim=1,
     )
-
-    if pred_rots.ndim == 2 and pred_rots.shape[-1] == 4:
-        pred_quats = pred_rots
-        quat_allo = pred_quats / (torch.norm(pred_quats, dim=1, keepdim=True) + eps)
-        if is_allo:
-            quat_ego = allocentric_to_egocentric_torch(translation, quat_allo, eps=eps)
-        else:
-            quat_ego = quat_allo
-        rot_ego = quat2mat_torch(quat_ego)
-    if pred_rots.ndim == 3 and pred_rots.shape[-1] == 3:  # Nx3x3
-        if is_allo:
-            rot_ego = allo_to_ego_mat_torch(translation, pred_rots, eps=eps)
-        else:
-            rot_ego = pred_rots
+    if pred_rots is not None:
+        if pred_rots.ndim == 2 and pred_rots.shape[-1] == 4:
+            pred_quats = pred_rots
+            quat_allo = pred_quats / (torch.norm(pred_quats, dim=1, keepdim=True) + eps)
+            if is_allo:
+                quat_ego = allocentric_to_egocentric_torch(translation, quat_allo, eps=eps)
+            else:
+                quat_ego = quat_allo
+            rot_ego = quat2mat_torch(quat_ego)
+        if pred_rots.ndim == 3 and pred_rots.shape[-1] == 3:  # Nx3x3
+            if is_allo:
+                rot_ego = allo_to_ego_mat_torch(translation, pred_rots, eps=eps)
+            else:
+                rot_ego = pred_rots
+    else:
+        rot_ego=None
     return rot_ego, translation
 
 def trans_from_predictions_train(

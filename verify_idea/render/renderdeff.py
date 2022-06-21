@@ -48,8 +48,8 @@ classes = idx2class.values()
 classes = sorted(classes)
 
 # DEPTH_FACTOR = 1000.
-IM_H = 480
-IM_W = 640
+IM_H = 64
+IM_W = 64
 near = 0.01
 far = 6.5
 
@@ -65,7 +65,7 @@ scenes = [i for i in range(1, 15 + 1)]   #场景
 # xyz_root = osp.normpath(osp.join(PROJ_ROOT, "datasets/BOP_DATASETS/lm/train_pbr/xyz_crop"))
 xyz_root = osp.normpath(osp.join(PROJ_ROOT, "datasets/BOP_DATASETS/lm/test/nxyz_crop"))
 
-K = np.array([[572.4114, 0, 325.2611], [0, 573.57043, 242.04899], [0, 0, 1]])  #这里可能要改
+K = np.array([[572.4114, 0, 32], [0, 573.57043, 32], [0, 0, 1]])  #这里可能要改
 dnw=DiffRenderer_Normal_Wrapper(
             model_paths,device="cuda"
         )
@@ -81,11 +81,19 @@ R = torch.tensor(
     device="cuda:0"
 )
 R=R.reshape(1,3,3)
-R=R.repeat(2,1,1)
-T = torch.tensor([42.36749640, 1.84263252, 768.28001229], dtype=torch.float32,device="cuda:0") / 1000
+R=R.repeat(13,1,1)
+# T = torch.tensor([42.36749640, 1.84263252, 768.28001229], dtype=torch.float32,device="cuda:0") / 1000
+T = torch.tensor([0, 0, 1], dtype=torch.float32,device="cuda:0") 
+
 K=torch.tensor(K, dtype=torch.float32,).reshape(1,3,3)
-K=K.repeat(2,1,1)
-img_normal=dnw((1,2),R,R,K,(480,640))
+K=K.repeat(13,1,1)
+img_normal=dnw((range(13)),R,K,(64,64))
+for i in range(13):
+    pre_i=img_normal[0].detach().cpu().numpy()*255
+    s="norml/%04d.png"%(i,)
+    cv2.imwrite(s,pre_i)
+
+
 
 
 pre_i=img_normal[0].detach().cpu().numpy()*255

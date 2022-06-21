@@ -6,6 +6,8 @@ import torch
 import torch.nn.functional as F
 import os.path as osp
 import sys
+
+from zmq import device
 from detectron2.data import MetadataCatalog
 import ref
 from lib.meshrenderer.meshrenderer_phong_normals import Renderer
@@ -157,11 +159,13 @@ class PyrotLoss:
         # img_normal=self.renderer[dataset_name]((1,2),R,R,K,(480,640))
         img_normal_pre=img_normal[:24]
         img_normal_gt=img_normal[24:]
-        # pre_i=img_normal_pre[0].detach().cpu().numpy()*255
-        # gt_i=img_normal_gt[0].detach().cpu().numpy()*255
+        mask=((img_normal_gt[...,:1]!=0)|(img_normal_gt[...,1:2]!=0)|(img_normal_gt[...,2:]!=0))
+        mask=torch.squeeze(mask)
+        pre_i=img_normal_pre[0].detach().cpu().numpy()*255
+        gt_i=img_normal_gt[0].detach().cpu().numpy()*255
 
-        # cv2.imwrite("a.png",pre_i)
-        # cv2.imwrite("b.png",gt_i)
+        cv2.imwrite("a.png",pre_i)
+        cv2.imwrite("b.png",gt_i)
 
                
 
@@ -180,7 +184,8 @@ class PyrotLoss:
         cos_simi=1-F.cosine_similarity(img_normal_pre,img_normal_gt,dim=3)
         # loss_dict["loss_coor"]=cos_simi.sum()/gt_mask_xyz.sum().float().clamp(min=1.0)
         #=====================
-        loss_dict ={"loss_rot_normal":cos_simi.sum()}
+        cos_simi=mask*cos_simi
+        loss_dict ={"loss_rot_normal":cos_simi.sum()/mask.sum()}
         # endtime3=datetime.datetime.now()
         # print((endtime3-endtime2).microseconds)
 

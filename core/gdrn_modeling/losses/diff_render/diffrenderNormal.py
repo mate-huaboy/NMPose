@@ -42,7 +42,7 @@ class DiffRender(nn.Module):
             faces_per_pixel=1,
             bin_size=None,  # 0
             perspective_correct=True,
-            max_faces_per_bin=50000
+            # max_faces_per_bin=50000
         )
         self.blend_params = BlendParams(sigma=1e-4, gamma=1e-4, background_color=(0.0, 0.0, 0.0))
         rasterizer = MeshRasterizer(

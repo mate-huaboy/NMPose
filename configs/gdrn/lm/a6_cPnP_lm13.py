@@ -65,6 +65,7 @@ MODEL = dict(
         PNP_NET=dict(
             # R_ONLY=False,  #这里改为true会怎样？
             FREEZE=False,
+            ENABLE=True,
             # FREEZE=True,
             R_ONLY=True,
             CENTER_TRANS=True,

@@ -53,7 +53,7 @@ class DiffRender(nn.Module):
             faces_per_pixel=1,
             bin_size=None,  # 0
             perspective_correct=True,
-            max_faces_per_bin=50000
+            # max_faces_per_bin=50000
         )
         self.blend_params = BlendParams(sigma=1e-4, gamma=1e-4, background_color=(0.0, 0.0, 0.0))
         rasterizer = MeshRasterizer(
@@ -115,7 +115,7 @@ class DiffRender(nn.Module):
         t=self.cam_opencv2pytch3d[:3,:3]@torch.tensor([0,0,1],device=T.device,dtype=torch.float32).reshape(3,1)
         t=t.reshape(1,3)
         t=t.repeat(B,1)
-        K=K.repeat(2,1,1)
+        # K=K.repeat(2,1,1)
         # t = -(R@T[...,:3,3:]).squeeze(-1)
         #这里最好改一下，把他放在外面而增加速度
         # start1=datetime.datetime.now()
@@ -184,7 +184,7 @@ class DiffRenderer_Normal_Wrapper(nn.Module):
 
         self.renderers = nn.ModuleList(self.renderers)
         self.cls2idx = None  # updated outside,
-    def forward(self, model_names, T,gt_T, K, render_image_size=(480,640), near=0.1, far=6, render_tex=False):
+    def forward(self, model_names, T, K, render_image_size=(480,640), near=0.1, far=6, render_tex=False):
 
         normal_outputs = []
         # uniq=torch.unique(model_names)
@@ -220,16 +220,16 @@ class DiffRenderer_Normal_Wrapper(nn.Module):
         mesh = Meshes(
             verts=V_l,faces=F_l,verts_normals=v_n_l
         )
-        mesh=mesh.extend(2)
+        # mesh=mesh.extend(2)
         # T=torch.cat([T,gt_T],dim=0)
         normal_pre = self.renderers[0](T, K, mesh,render_image_size,
                                                     near, far,render_texture=render_tex)
-        normal_gt=self.renderers[0](gt_T, K, mesh,render_image_size,
-                                                    near, far,render_texture=render_tex)
-        normal=torch.cat([normal_pre,normal_gt],dim=0)
+        # normal_gt=self.renderers[0](gt_T, K, mesh,render_image_size,
+        #                                             near, far,render_texture=render_tex)
+        # normal=torch.cat([normal_pre,normal_gt],dim=0)
 
         # normal = self.renderers[model_idx](T[b:b + 1], K[b:b + 1], render_image_size,
         #                                           near, far, render_texture=render_tex)
 
             # normal_outputs.append(normal)
-        return normal
+        return normal_pre
