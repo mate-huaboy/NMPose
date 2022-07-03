@@ -50,15 +50,18 @@ class GDRN(nn.Module):
         self.imgH=480
         self.imgW=640
         self.imgSize=np.array([self.imgH,self.imgW])
-        self.T = np.array([[2 / W, 0, -1],
+        self.T = torch.tensor(np.array([[2 / W, 0, -1],
               [0, 2 / H, -1],
-              [0, 0, 1]])
+              [0, 0, 1]]),device="cuda:0",dtype=torch.float32) 
+
         self.l=np.array([[0,0,1]])
         self.rot_normalLoss=PyrotLoss()
         #建议在这里创建一个render?
         # for dataset_name in cfg.DATASETS.TRAIN:
         #     self.rot_normalLoss.add_dataset_name(dataset_name)
-        self.rot_normalLoss.add_dataset_name( cfg.DATASETS.TRAIN[0])
+        #可以去掉该信息
+        if self.cfg.MODEL.CDPN.PNP_NET.ENABLE:
+            self.rot_normalLoss.add_dataset_name( cfg.DATASETS.TRAIN[0])
 
         #
 
@@ -170,7 +173,8 @@ class GDRN(nn.Module):
             coor_x=gt_xyz[:,0:1]
             coor_y=gt_xyz[:,1:2]
             coor_z=gt_xyz[:,2:3]
-            mask=None
+            # mask=gt_mask_visib
+            # mask=mask[:,None]
             region=None
 
        
@@ -178,15 +182,19 @@ class GDRN(nn.Module):
         device = x.device
         pred_t_only = self.trans_head_net(features)
         if pnp_net_cfg.R_ONLY and pnp_net_cfg.CENTER_TRANS and pnp_net_cfg.ENABLE:  # override trans pred,fisrt step need not run 
-            with torch.no_grad():
+            #gaga
+            #加上可微操作
+            # with torch.no_grad():
                
 
         #移动到中心
         #需要已知原来的缩放比例，现在的中心，以及现在的深度，使用的插值方法等
         #now 这个过程可以反向传播，如有需要的话,首先先不考虑法线中心的反向传播吧，怕被影响
                 pred_trans_temp,cent_temp = trans_from_pred_centroid_z(
-                    pred_centroids=pred_t_only[:, :2],
-                    pred_z_vals=pred_t_only[:, 2:3],  # must be [B, 1]
+                    # pred_centroids=pred_t_only[:, :2],
+                    # pred_z_vals=pred_t_only[:, 2:3],  # must be [B, 1]
+                    pred_centroids=gt_trans_ratio[:, :2],
+                    pred_z_vals=gt_trans_ratio[:, 2:3],  # must be [B, 1]
                     roi_cams=roi_cams,
                     roi_centers=roi_centers,
                     resize_ratios=resize_ratios,
@@ -214,39 +222,53 @@ class GDRN(nn.Module):
                 # coor_feat=F.normalize(coor_feat,p=2,dim=1)
 
 
-                pred_trans_temp=pred_trans_temp.cpu().numpy()
-                cent_temp=cent_temp.cpu().numpy()
-                whs=roi_whs.cpu().numpy()
+                # pred_trans_temp=pred_trans_temp.cpu().numpy()
+                # cent_temp=cent_temp.cpu().numpy()
+                # whs=roi_whs.cpu().numpy()
                 # aa=coor_feat[0].cpu().numpy().transpose(1,2,0)
                 # cv2.imwrite("b.png",coor_feat[0].cpu().numpy().transpose(1,2,0)*255)
 
-                for t,c,wh in zip(pred_trans_temp,cent_temp,whs):
+                for t,c,wh in zip(pred_trans_temp,cent_temp,roi_whs):
                     # risio=wh[0]/64/s*t[2]/1
                     risio=1
-                    bbox_center = np.array([32, 32])+c/wh[0]*64#cal by myself
+                    # bbox_center = np.array([32, 32])+c/wh[0]*64#cal by myself
                     # bbox_center = np.array([32, 32])+c/self.imgSize*64#cal by myself
 
                     # bbox_center = np.array([32, 32])+cent_temp[0]/whs[0][0]*64#cal by myself
 
                     # bbox_center=bbox_center.numpy()#need to cpu not good
-                    trans=get_affine_transform(bbox_center,(64/risio,64/risio),0,64)
-                    M=np.concatenate((trans,self.l))
+                    dalta_center=c/wh[0]*64
+                    # trans=get_affine_transform(bbox_center,(64/risio,64/risio),0,64)  #把这里改掉
+                    trans=torch.tensor(np.identity(3),device="cuda:0",dtype=torch.float32)
+                    trans[0:2,-1]=dalta_center
 
-                    trans=self.T@np.linalg.inv(M)@np.linalg.inv(self.T)
-                    Ms.append(trans[0:2])
+                    # M=np.concatenate((trans,self.l))
+                    trans=self.T@trans@torch.inverse(self.T)
+
+                    # trans=self.T@np.linalg.inv(M)@np.linalg.inv(self.T)
+                    Ms.append(trans[0:2].view(1,2,3))
 
 
-                Ms=torch.tensor(np.array(Ms).astype(np.float32)).to(device)
+                # Ms=torch.tensor(np.array(Ms).astype(np.float32)).to(device)
+              
+                Ms=torch.cat(Ms,dim=0)
                 grid=F.affine_grid(Ms,coor_feat.shape)
+
                 # grid=F.affine_grid(Ms,(24,3,64,64))
 
-                coor_feat1=F.grid_sample(coor_feat,grid)
+                coor_feat=F.grid_sample(coor_feat,grid)
+                # gt_xyz=F.grid_sample(gt_xyz,grid)  #真实的法线也做相应的移动
+                # grid1=F.affine_grid(Ms,(24,1,64,64))
+                # gt_mask_visib=gt_mask_visib[:,None]
+                # gt_mask_visib=F.grid_sample(gt_mask_visib,grid1)
+                # gt_mask_visib.squeeze_()
                 #好像真实的nxyz也应该移到中心
 
                 # coor_feat1=F.normalize(coor_feat1,p=2,dim=1)
-
-                cv2.imwrite("trans_after.png",coor_feat1[0].cpu().numpy().transpose(1,2,0)*255)
-                # cv2.imwrite("gt_nxyz.png",gt_xyz[0].cpu().numpy().transpose(1,2,0)*255)
+                # cv2.imwrite("real_img.png",x[0].cpu().numpy().transpose(1,2,0)*255)
+                # cv2.imwrite("trans_after.png",coor_feat[0].detach().cpu().numpy().transpose(1,2,0)*255)
+                
+                # cv2.imwrite("gt_nxyz.png",gt_xyz[0].detach().cpu().numpy().transpose(1,2,0)*255)
                 # roi_nxyz=coor_feat1[0].cpu().numpy().transpose(1,2,0) 
                 # print(np.linalg.norm(np.array([roi_nxyz[34][30][0],roi_nxyz[34][30][1],roi_nxyz[34][30][2]])))
                 # aa=np.linalg.norm(roi_nxyz,axis=2)
@@ -273,11 +295,11 @@ class GDRN(nn.Module):
                 
 
                 #为了方便调试，输出查看图片其实没有必要
-                coor_x=coor_feat1[:,0,]
+                coor_x=coor_feat[:,0,]
                 coor_x=coor_x[:,None]
-                coor_y=coor_feat1[:,1,:,:]
+                coor_y=coor_feat[:,1,:,:]
                 coor_y=coor_y[:,None]
-                coor_z=coor_feat1[:,2,:,:]
+                coor_z=coor_feat[:,2,:,:]
                 coor_z=coor_z[:,None]
 
                     
@@ -354,7 +376,7 @@ class GDRN(nn.Module):
         #修改为中心的移动
         if  pnp_net_cfg.ENABLE:
             pred_rot_, pred_t_ = self.pnp_net(
-                coor_feat1, region=region_atten, extents=roi_extents, mask_attention=mask_atten
+                coor_feat, region=region_atten, extents=roi_extents, mask_attention=mask_atten
             )
         
         
@@ -413,7 +435,10 @@ class GDRN(nn.Module):
             )
         else:
             raise ValueError(f"Unknown pnp_net trans type: {pnp_net_cfg.TRANS_TYPE}")
-
+        if not pnp_net_cfg.ENABLE:
+            pred_ego_rot =torch.tensor(np.array([1,0,0,0,1,0,0,0,1]).reshape(3,3),device="cuda:0")  #随便赋一个值，以消除后续使用的错误
+            pred_ego_rot=pred_ego_rot.view(1,3,3)
+            pred_ego_rot=pred_ego_rot.repeat(24,1,1)
         if not do_loss:  # test
             out_dict = {"rot": pred_ego_rot, "trans": pred_trans}
             if cfg.TEST.USE_PNP:
@@ -565,9 +590,18 @@ class GDRN(nn.Module):
                 coor_feat = torch.cat([out_x, out_y, out_z], dim=1)
                 #归一化
                 # coor_feat=F.normalize(coor_feat,p=2,dim=1)
-                cos_simi=1-F.cosine_similarity(coor_feat,gt_xyz,dim=1)
-                cos_simi=cos_simi*gt_mask_xyz#需要乘以mask（刚加上，但还未验证）
-                loss_dict["loss_coor"]=cos_simi.sum()/gt_mask_xyz.sum().float().clamp(min=1.0)  #
+                cos_simi=F.cosine_similarity(coor_feat,gt_xyz,dim=1)
+                # cos_simi=cos_simi*gt_mask_xyz#需要乘以mask（刚加上，但还未验证）
+                # a=cos_simi[0].detach().cpu().numpy()*255
+                # cv2.imwrite("cossim.png",cos_simi[0].detach().cpu().numpy()*255)
+
+                # cos_simi=cos_simi#需要乘以mask（刚加上，但还未验证）
+                mask=(cos_simi!=0)
+                cos_simi=cos_simi.sum()/mask.sum()#这样就比一大了
+                # cos_simi=cos_simi.sum()/gt_mask_xyz.sum().float().clamp(min=1.0)#这样就比一大了
+                cos_simi=cos_simi.arccos()
+                # print(cos_simi)
+                loss_dict["loss_coor"]= cos_simi #
                 
                 
             else:
@@ -686,7 +720,7 @@ class GDRN(nn.Module):
                     raise ValueError(f"Unknown rot loss type: {pnp_net_cfg.ROT_LOSS_TYPE}")
                 loss_dict["loss_rot"] *= pnp_net_cfg.ROT_LW
 
-        # centroid loss -------------
+        # centroid loss -------------这里最好改一下，改成平移net freeze的时候就不要跑这一段
         if pnp_net_cfg.CENTROID_LW > 0:
             assert (
                 pnp_net_cfg.TRANS_TYPE == "centroid_z"
@@ -721,7 +755,7 @@ class GDRN(nn.Module):
                 raise ValueError(f"Unknown z loss type: {pnp_net_cfg.Z_LOSS_TYPE}")
             loss_dict["loss_z"] *= pnp_net_cfg.Z_LW
 
-        # trans loss ------------------
+        # trans loss ------------------没走平移loss
         if pnp_net_cfg.TRANS_LW > 0:
             if pnp_net_cfg.TRANS_LOSS_DISENTANGLE:
                 # NOTE: disentangle xy/z

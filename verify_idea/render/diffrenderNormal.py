@@ -8,7 +8,7 @@ import tqdm
 cur_dir=osp.abspath(osp.dirname(__file__))
 sys.path.insert(0,cur_dir)
 from pytorch3d.structures import Meshes
-from core.gdrn_modeling.losses.diff_render.ColorShader  import NormalShader
+from ColorShader  import NormalShader
 from pytorch3d.renderer import (
     PerspectiveCameras,
     RasterizationSettings,
@@ -198,14 +198,15 @@ class DiffRenderer_Normal_Wrapper(nn.Module):
             # ind=model_names==model_idx
             # a=torch.nonzero(ind)
             # m=self.meshes[model_idx].extend(a.shape[0])
-            m=self.meshes[model_idx]
+            m=self.meshes[model_idx-1]
             # verts=m.verts_list()
             # faces=m.faces_list()
             # verts_normals=m.verts_normals_list()
             V_l.append(m.verts_list()[0])
             F_l.append( m.faces_list()[0])
-            v_n_l.append( m.verts_normals_list()[0])
-
+            v_n=m.verts_normals_list()[0]
+            v_n=T[b].view(1,3,3)@v_n[...,None]
+            v_n_l.append( v_n.squeeze_())
             # for i in range(a.shape[0]):
             #     V_l.append(verts[i])
             #     F_l.append(faces[i])

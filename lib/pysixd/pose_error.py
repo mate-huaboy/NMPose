@@ -306,7 +306,9 @@ def add(R_est, t_est, R_gt, t_gt, pts):
     :param pts: nx3 ndarray with 3D model points.
     :return: The calculated error.
     """
-    pts_est = transform_pts_Rt(pts, R_est, t_est)
+    pts_est = transform_pts_Rt(pts, R_est, t_est)#要是不是一一对应的呢，也就是对称的时候
+
+    
     pts_gt = transform_pts_Rt(pts, R_gt, t_gt)
     e = np.linalg.norm(pts_est - pts_gt, axis=1).mean()
     return e
@@ -407,7 +409,7 @@ def re(R_est, R_gt):
     assert R_est.shape == R_gt.shape == (3, 3)
     rotation_diff = np.dot(R_est, R_gt.T)
     trace = np.trace(rotation_diff)
-    trace = trace if trace <= 3 else 3
+    trace = trace if trace <= 3 else 3#不知道为什么可以这样评估旋转误差
     # Avoid invalid values due to numerical errors
     error_cos = min(1.0, max(-1.0, 0.5 * (trace - 1.0)))
     rd_deg = np.rad2deg(np.arccos(error_cos))

@@ -48,41 +48,7 @@ class PyrotLoss:
     ):
         self.renderer={}
         self.device=device
-        # if dataset_name in self.model_points:
-        #     return self.model_points[dataset_name]
-
-        # dset_meta = MetadataCatalog.get(dataset_name)
-        # ref_key = dset_meta.ref_key
-        # data_ref = ref.__dict__[ref_key]
-        # #==============
-        # # if self.renderer is None:
-        # #     # self.renderer = Renderer(
-        # #     #     model_paths, vertex_tmp_store_folder=osp.join(PROJ_ROOT, ".cache"), vertex_scale=0.001
-        # #     # )
-        # #     model_paths = [osp.join(self.models_root, f"obj_{_id:06d}.ply") for _id in ref.lm_full.id2obj]
-        # #     self.renderer = Renderer(
-        # #         model_paths, vertex_tmp_store_folder=osp.join(
-        # #             PROJ_ROOT, ".cache")
-        # #     )
-        # #=====================
-        # objs = dset_meta.objs
-        # # cfg = self.cfg
-        # model_paths=[]
-        # for i, obj_name in enumerate(objs):
-        #     obj_id = data_ref.obj2id[obj_name]
-        #     model_path = osp.join(data_ref.model_dir, f"obj_{obj_id:06d}.ply")
-        #     model_paths.append(model_path)
-
-        # # self.renderer[dataset_name]=Renderer(
-        # #         model_paths, vertex_tmp_store_folder=osp.join(
-        # #             PROJ_ROOT, ".cache")
-        # #     )
-        # self.renderer[dataset_name]=DiffRenderer_Normal_Wrapper(
-        #     model_paths,
-        # )
-        # self.renderer[dataset_name].cls2idx = class2idx #这里可能有错误或者需要修改
-
-        # return self.renderer[dataset_name]
+      
     def add_dataset_name( self,
       dataset_name):
         if dataset_name in self.renderer:
@@ -91,17 +57,6 @@ class PyrotLoss:
         dset_meta = MetadataCatalog.get(dataset_name)
         ref_key = dset_meta.ref_key
         data_ref = ref.__dict__[ref_key]
-        #==============
-        # if self.renderer is None:
-        #     # self.renderer = Renderer(
-        #     #     model_paths, vertex_tmp_store_folder=osp.join(PROJ_ROOT, ".cache"), vertex_scale=0.001
-        #     # )
-        #     model_paths = [osp.join(self.models_root, f"obj_{_id:06d}.ply") for _id in ref.lm_full.id2obj]
-        #     self.renderer = Renderer(
-        #         model_paths, vertex_tmp_store_folder=osp.join(
-        #             PROJ_ROOT, ".cache")
-        #     )
-        #=====================
         objs = dset_meta.objs
         # cfg = self.cfg
         model_paths=[]
@@ -109,11 +64,6 @@ class PyrotLoss:
             obj_id = data_ref.obj2id[obj_name]
             model_path = osp.join(data_ref.model_dir, f"obj_{obj_id:06d}.ply")
             model_paths.append(model_path)
-
-        # self.renderer[dataset_name]=Renderer(
-        #         model_paths, vertex_tmp_store_folder=osp.join(
-        #             PROJ_ROOT, ".cache")
-        #     )
         self.renderer[dataset_name]=DiffRenderer_Normal_Wrapper(
             model_paths,device=self.device, render_image_size=(IM_H,IM_W)
         )
@@ -159,13 +109,13 @@ class PyrotLoss:
         # img_normal=self.renderer[dataset_name]((1,2),R,R,K,(480,640))
         img_normal_pre=img_normal[:24]
         img_normal_gt=img_normal[24:]
-        mask=((img_normal_gt[...,:1]!=0)|(img_normal_gt[...,1:2]!=0)|(img_normal_gt[...,2:]!=0))
-        mask=torch.squeeze(mask)
-        pre_i=img_normal_pre[0].detach().cpu().numpy()*255
-        gt_i=img_normal_gt[0].detach().cpu().numpy()*255
+        # mask=((img_normal_gt[...,:1]!=0)|(img_normal_gt[...,1:2]!=0)|(img_normal_gt[...,2:]!=0))
+        # mask=torch.squeeze(mask)
+        # pre_i=img_normal_pre[0].detach().cpu().numpy()*255
+        # gt_i=img_normal_gt[0].detach().cpu().numpy()*255
 
-        cv2.imwrite("a.png",pre_i)
-        cv2.imwrite("b.png",gt_i)
+        # cv2.imwrite("a.png",pre_i)
+        # cv2.imwrite("b.png",gt_i)
 
                
 
@@ -183,10 +133,13 @@ class PyrotLoss:
 
         # cos_simi=1-F.cosine_similarity(img_normal_pre,img_normal_gt,dim=3)
         cos_simi=F.cosine_similarity(img_normal_pre,img_normal_gt,dim=3)
+        mask=(cos_simi!=0)
+        mask=torch.squeeze(mask)
+        # cos_simi=1-cos_simi
 
         # loss_dict["loss_coor"]=cos_simi.sum()/gt_mask_xyz.sum().float().clamp(min=1.0)
         #=====================
-        cos_simi=mask*cos_simi
+        # cos_simi=mask*cos_simi
         cos_simi=cos_simi.sum()/mask.sum()
         cos_simi=cos_simi.arccos()
         loss_dict ={"loss_rot_normal":cos_simi}

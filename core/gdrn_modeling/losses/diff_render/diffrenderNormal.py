@@ -98,7 +98,7 @@ class DiffRender(nn.Module):
         cameras = PerspectiveCameras(R=R,T=t,focal_length=torch.stack([K[:, 0, 0], K[:, 1, 1]], dim=-1),
                                      principal_point=[principal_p] * B, image_size=[render_image_size] * B, in_ndc=False,
                                      device=device)# why not use R and t
-       
+        
         target_images = self.renderer(mesh, cameras=cameras,blendParams=self.blend_params) #1*480*640*4
         return target_images[...,:3]
 
@@ -143,10 +143,14 @@ class DiffRenderer_Normal_Wrapper(nn.Module):
             # verts_normals=m.verts_normals_list()
             V_l.append(m.verts_list()[0])
             F_l.append( m.faces_list()[0])
-            v_n_l.append( m.verts_normals_list()[0])
+            v_n=m.verts_normals_list()[0]
+            v_n=T[b].view(1,3,3)@v_n[...,None]  #这里的T是不是要转到pytorch3d的坐标系下呢？
+            v_n_l.append( v_n.squeeze_())
+
         mesh = Meshes(
             verts=V_l,faces=F_l,verts_normals=v_n_l
         )
+        mesh.verts_normals_list
         normal_pre = self.renderers[0](T, K, mesh,render_image_size,
                                                     near, far,render_texture=render_tex)
         normal_gt=self.renderers[0](gt_T, K, mesh,render_image_size,

@@ -2,7 +2,7 @@
 
 _base_ = ["../../_base_/gdrn_base.py"]
 
-OUTPUT_DIR = "output/gdrn/lm/a6_cPnP_lm13"#改变一下输出路径以同时跑两个
+OUTPUT_DIR = "output3/gdrn/lm/a6_cPnP_lm13"#改变一下输出路径以同时跑两个
 INPUT = dict(
     DZI_PAD_SCALE=1.5,
     COLOR_AUG_PROB=0.0,
@@ -25,7 +25,7 @@ SOLVER = dict(
     IMS_PER_BATCH=24,  #barchsize 24?
     LR_SCHEDULER_NAME="flat_and_anneal",
     ANNEAL_METHOD="cosine",  # "cosine"
-    ANNEAL_POINT=0.55,# 修改之前是0.72
+    ANNEAL_POINT=0.72,# 修改之前是0.72
     # REL_STEPS=(0.3125, 0.625, 0.9375),
     # OPTIMIZER_CFG=dict(_delete_=True, type="Ranger", lr=1e-4, weight_decay=0),#
     OPTIMIZER_CFG=dict(_delete_=True, type="Ranger", lr=1e-4, weight_decay=0),#修改一下学习率
@@ -49,10 +49,10 @@ MODEL = dict(
         BACKBONE=dict( FREEZE=True) ,#同时不训练
         ROT_HEAD=dict(
 
-            # ENABLED=False,#去掉旋转tou
+            ENABLED=False,#去掉旋转tou
             FREEZE=True,  #同时不训练
-            ENABLED=True,#去掉旋转tou
-            # FREEZE=False,  #同时不训练
+            # ENABLED=True,#去掉旋转tou
+            # FREEZE=False,  #同时训练
             # FREEZE=False,
             ROT_CLASS_AWARE=False,
             MASK_CLASS_AWARE=False,
@@ -66,13 +66,17 @@ MODEL = dict(
             # R_ONLY=False,  #这里改为true会怎样？
             FREEZE=False,
             ENABLE=True,
+            # ENABLE=False,
+
             # FREEZE=True,
             R_ONLY=True,
             CENTER_TRANS=True,
             # REGION_ATTENTION=True,
-            # WITH_2D_COORD=True,
             REGION_ATTENTION=False,
-            WITH_2D_COORD=False,
+
+            WITH_2D_COORD=True,#加上这个2d对应
+            # WITH_2D_COORD=False,
+
             ROT_TYPE="allo_rot6d",
             # ROT_TYPE="allo_quat",
             

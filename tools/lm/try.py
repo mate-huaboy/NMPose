@@ -5,6 +5,8 @@ from __future__ import division, print_function
 
 import os
 
+# from pyrsistent import T
+
 os.environ["PYOPENGL_PLATFORM"] = "egl"
 
 import os.path as osp
@@ -24,7 +26,7 @@ from lib.vis_utils.image import grid_show
 from lib.pysixd import misc
 from lib.utils.mask_utils import mask2bbox_xyxy
 lm_model_dir = osp.normpath(osp.join(PROJ_ROOT, "datasets/BOP_DATASETS/lm/models"))
-K = np.array([[572.4114, 0, 325.2611], [0, 573.57043, 242.04899], [0, 0, 1]])  #这里可能要改
+K = np.array([[572.4114, 0, 64], [0, 573.57043, 64], [0, 0, 1]])  #这里可能要改
 idx2class = {
     1: "ape",
     2: "benchvise",
@@ -49,11 +51,23 @@ classes = idx2class.values()
 classes = sorted(classes)
 
 # DEPTH_FACTOR = 1000.
-IM_H = 480
-IM_W = 640
+IM_H = 128
+IM_W = 128
 near = 0.01
 far = 6.5
+sys_T=np.array([-0.999964, -0.00333777, -0.0077452, 0.232611, 0.00321462, -0.999869, 0.0158593, 0.694388, -0.00779712, 0.0158338, 0.999844, -0.0792063, 0, 0, 0, 1]).reshape(4,4)
+# sys_T=np.array([-0.999633, 0.026679, 0.00479336, -0.262139, -0.0266744, -0.999644, 0.00100504, -0.197966, 0.00481847, 0.000876815, 0.999988, 0.0321652, 0, 0, 0, 1] ).reshape(4,4)
 
+R_gt=np.array([0.99917501, -0.0299925, 0.0273719, -0.013194, -0.877334, -0.47969899, 0.0384017, 0.47894201, -0.87700599]).reshape(3,3)
+t_gt1=np.array( [-1.64189978, -81.29900694, 1029.99741383]).reshape(1,3)/1000
+R_gt=np.array(  [
+        [0.66307002, 0.74850100, 0.00921593],
+        [0.50728703, -0.44026601, -0.74082798],
+        [-0.55045301, 0.49589601, -0.67163098],
+    ],).reshape(3,3)
+
+# R_gt=np.array([[1.0,0,0],[0,1.0,0],[0,0,1.0]])
+t_gt=np.array([0,0,1])
 data_dir = osp.normpath(osp.join(PROJ_ROOT, "datasets/BOP_DATASETS/lm/test"))
 
 cls_indexes = sorted(idx2class.keys())
@@ -71,27 +85,69 @@ def get_renderer():
             model_paths, vertex_tmp_store_folder=osp.join(PROJ_ROOT, ".cache")
         )
     return renderer
-R=np.array([[1.0,0,0],[0,1.0,0],[0,0,1.0]])
-t=np.array([0,0,1])
-# device = torch.device('cuda:0') 
-# R=torch.tensor(R,requires_grad=True).to(device)
-# t=torch.tensor(t).to(device)
-# IM_H=torch.tensor(IM_H).to(device)
-# IM_W=torch.tensor(IM_W).to(device)
-# near=torch.tensor(near).to(device)
-# far=torch.tensor(far).to(device)
-device = torch.device('cuda:0') 
-R=torch.tensor(R,requires_grad=True)
-# t=torch.tensor(t)
-# IM_H=torch.tensor(IM_H)
-# IM_W=torch.tensor(IM_W)
-# near=torch.tensor(near)
-# far=torch.tensor(far)
-# print(R.data)
-# np.dot(R.t(), t.squeeze())
-R=R.data.numpy()
 
-# bgr_gl, depth_gl,nomal_img = get_renderer().render(3, IM_W, IM_H, K, R, t, near, far)#如果固定t则如何呢
-# bgr_gl, depth_gl,nomal_img = get_renderer().render(3, IM_W.data, IM_H.data, K.data, R.data, t.data, near.data, far.data)#如果固定t则如何呢,buxing,yao gaide taiduo l e
 
-bgr_gl, depth_gl,nomal_img = get_renderer().render(3, IM_W, IM_H, K, R, t, near, far)#如果固定t则如何呢
+
+bgr_gl1, depth_gl,nomal_img1 = get_renderer().render(9, IM_W, IM_H, K, R_gt, t_gt, near, far)#如果固定t则如何呢
+nomal_img1=nomal_img1*255
+cv2.imwrite("be.png",nomal_img1)
+R=R_gt.dot(sys_T[:3,:3])
+# R=sys_T[:3,:3].dot(R_gt)
+print(R.dot(R.transpose()))
+bgr_gl2, depth_gl,nomal_img2 = get_renderer().render(9, IM_W, IM_H, K, R, t_gt, near, far)#如果固定t则如何呢
+bgr_gl3, depth_gl,nomal_img3 = get_renderer().render(9, IM_W, IM_H, K, R, t_gt1, near, far)#如果固定t则如何呢
+
+
+
+nomal_img2=nomal_img2*255
+nomal_img3=nomal_img3*255
+
+cv2.imwrite("nomal_img2.png",nomal_img2)
+cv2.imwrite("nomal_img3.png",nomal_img3)
+
+cv2.imwrite("af_only_R.png",nomal_img2)
+cv2.imwrite("diff_bgr.png",bgr_gl1-bgr_gl2)
+cv2.imwrite("diff_sub1.png",nomal_img1-nomal_img2)
+cv2.imwrite("diff_sub2.png",nomal_img2-nomal_img1)
+z=nomal_img1[...,2]
+y=nomal_img1[...,1]
+x=nomal_img1[...,0]
+y_b0=(z>0).astype(np.float32)
+cv2.imwrite("y_b0.png",y_b0*255)
+y_m0=(z<0).astype(np.float32)
+cv2.imwrite("y_m0.png",y_m0*255)
+
+y=nomal_img2[...,1]
+
+y_b0=(y>0).astype(np.float32)
+cv2.imwrite("y_b02.png",y_b0*255)
+y_m0=(y<0).astype(np.float32)
+cv2.imwrite("y_m02.png",y_m0*255)
+
+import torch
+import torch.nn.functional as F
+t_nomal_1=torch.tensor(nomal_img1,dtype=torch.float32)
+t_nomal_2=torch.tensor(nomal_img2,dtype=torch.float32)
+diff=F.cosine_similarity(t_nomal_1,t_nomal_2,dim=2)
+diff=diff*-0.5+0.5
+# mask=(t_nomal_1[...,0]!=0)|(t_nomal_1[...,1]!=0)|(t_nomal_1[...,2]!=0)
+# mask1=(t_nomal_2[...,0]!=0)|(t_nomal_2[...,1]!=0)|(t_nomal_2[...,2]!=0)
+
+# diff=diff*mask
+cv2.imwrite("bgr1.png",bgr_gl1)
+cv2.imwrite("bgr2.png",bgr_gl2)
+cv2.imwrite("diff.png",diff.numpy().reshape(128,128,1)*255)
+
+
+T=np.array(sys_T)
+T[:3,:3]=R_gt
+T[:3,3]=t_gt.reshape(3)
+T=T.dot(sys_T)
+t=T[:3,3].reshape(3,1)
+R1=T[:3,:3]
+bgr_gl, depth_gl,nomal_img = get_renderer().render(9, IM_W, IM_H, K,R1, t, near, far)#如果固定t则如何呢
+cv2.imwrite("af_.png",nomal_img)
+
+
+
+

@@ -80,20 +80,30 @@ R = torch.tensor(
     dtype=torch.float32,
     device="cuda:0"
 )
-R=R.reshape(1,3,3)
-R=R.repeat(13,1,1)
+# sys_T=np.array([-0.999633, 0.026679, 0.00479336,  -0.0266744, -0.999644, 0.00100504, 0.00481847, 0.000876815, 0.999988,] ).reshape(3,3)
+sys_T=np.array([-0.999964, -0.00333777, -0.0077452,  0.00321462, -0.999869, 0.0158593,  -0.00779712, 0.0158338, 0.999844, ]).reshape(3,3)
+sys_T=torch.tensor(sys_T,dtype=torch.float32,device="cuda:0")
+R1=R.matmul(sys_T)
+R=R.view(1,3,3)
+R1=R1.view(1,3,3)
+R=torch.cat([R,R1],dim=0)
+# R=R.reshape(1,3,3)
+# R=R.repeat(13,1,1)
 # T = torch.tensor([42.36749640, 1.84263252, 768.28001229], dtype=torch.float32,device="cuda:0") / 1000
-T = torch.tensor([0, 0, 1], dtype=torch.float32,device="cuda:0") 
+# T = torch.tensor([0, 0, 1], dtype=torch.float32,device="cuda:0") 
 
 K=torch.tensor(K, dtype=torch.float32,).reshape(1,3,3)
-K=K.repeat(13,1,1)
-img_normal=dnw((range(13)),R,K,(128,128))
-for i in range(13):
+K=K.repeat(2,1,1)
+img_normal=dnw((10,10),R,K,(128,128))
+for i in range(2):
     pre_i=img_normal[i].detach().cpu().numpy()*255
     s="norml%04d.png"%(i,)
     cv2.imwrite(s,pre_i)
+import torch.nn.functional as F
 
-
+cossim=1-F.cosine_similarity(img_normal[0],img_normal[1],dim=2)
+cv2.imwrite("cossim.png",cossim.detach().cpu().numpy()*255)
+cv2.imwrite("difrender.png",(img_normal[0]-img_normal[1]).detach().cpu().numpy()*255)
 
 
 pre_i=img_normal[0].detach().cpu().numpy()*255

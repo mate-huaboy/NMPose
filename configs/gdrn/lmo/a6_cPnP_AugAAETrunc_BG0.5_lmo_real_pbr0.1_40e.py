@@ -61,17 +61,25 @@ MODEL = dict(
     PIXEL_STD=[255.0, 255.0, 255.0],
     CDPN=dict(
         ROT_HEAD=dict(
+            ENABLED=True,
+
             FREEZE=False,
             ROT_CLASS_AWARE=False,
             MASK_CLASS_AWARE=False,
             XYZ_LW=1.0,
             REGION_CLASS_AWARE=False,
-            NUM_REGIONS=64,
+            # NUM_REGIONS=64,
+            NUM_REGIONS=0,
+
         ),
         PNP_NET=dict(
-            R_ONLY=False,
-            REGION_ATTENTION=True,
-            WITH_2D_COORD=True,
+            FREEZE=False,
+            ENABLE=True,
+            R_ONLY=True,
+            # REGION_ATTENTION=True,改
+            REGION_ATTENTION=False,
+
+            WITH_2D_COORD=False,#去掉2d对应
             ROT_TYPE="allo_rot6d",
             TRANS_TYPE="centroid_z",
             PM_NORM_BY_EXTENT=True,
@@ -81,7 +89,9 @@ MODEL = dict(
             Z_LOSS_TYPE="L1",
             Z_LW=1.0,
         ),
-        TRANS_HEAD=dict(ENABLED=False),
+        TRANS_HEAD=dict(ENABLED=True,
+        FREEZE=False
+        ),
     ),
 )
 

@@ -33,7 +33,9 @@ void main(void) {
     if(rgb.x > 1.0) rgb.x = 1.0;
     if(rgb.y > 1.0) rgb.y = 1.0;
     if(rgb.z > 1.0) rgb.z = 1.0;
-    rgb_normals = vec3(Normal * 0.5 + 0.5); // transforms from [-1,1] to [0,1]  why dont konw,use this because have no diff
+    //rgb_normals = vec3(Normal * 0.5 + 0.5); // transforms from [-1,1] to [0,1]  why dont konw,use this because have no diff
+    
+    rgb_normals = Normal; // transforms from [-1,1] to [0,1]  why dont konw,use this because have no diff
     depth = v_view.z;
 }
 

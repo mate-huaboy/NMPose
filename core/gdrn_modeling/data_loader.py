@@ -294,7 +294,7 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
             model_info = loaded_models_info[str(obj_id)]
             if "symmetries_discrete" in model_info or "symmetries_continuous" in model_info:
                 sym_transforms = misc.get_symmetry_transformations(model_info, max_sym_disc_step=0.01)
-                sym_info = np.array([sym["R"] for sym in sym_transforms], dtype=np.float32)
+                sym_info = np.array([sym["R"] for sym in sym_transforms], dtype=np.float32)  #只要了R
             else:
                 sym_info = None
             cur_sym_infos[i] = sym_info
@@ -478,18 +478,21 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
                     roi_mask_obj = crop_resize_by_warp_affine(
                         mask_obj[:, :, None], bbox_center, scale, out_res, interpolation=mask_xyz_interp
                         ) 
-                    roi_mask_obj1 = ((roi_nxyz[0,:, :] != 0) | (roi_nxyz[1,:, :] != 0) | (roi_nxyz[2,:, :] != 0)).astype(np.bool).astype(np.float32)
+                    #加上真实的平移信息叭
+                    
+                    # roi_mask_obj1 = ((roi_nxyz[0,:, :] != 0) | (roi_nxyz[1,:, :] != 0) | (roi_nxyz[2,:, :] != 0)).astype(np.bool).astype(np.float32)
 
-                    roi_nxyz[0][roi_mask_obj1==1] = (roi_nxyz[0][roi_mask_obj1==1] / 255 -0.5)*2
-                    roi_nxyz[1][roi_mask_obj1==1] = (roi_nxyz[1][roi_mask_obj1==1] / 255 -0.5)*2 
-                    roi_nxyz[2][roi_mask_obj1==1] = (roi_nxyz[2] [roi_mask_obj1==1]/ 255 -0.5)*2 
-                    #再单位化
-                    y=np.linalg.norm(roi_nxyz,axis=0,keepdims=True)
-                    roi_nxyz[0][roi_mask_obj1==1]=roi_nxyz[0][roi_mask_obj1==1]/y[0][roi_mask_obj1==1]
-                    roi_nxyz[1][roi_mask_obj1==1]=roi_nxyz[1][roi_mask_obj1==1]/y[0][roi_mask_obj1==1]
-                    roi_nxyz[2][roi_mask_obj1==1]=roi_nxyz[2][roi_mask_obj1==1]/y[0][roi_mask_obj1==1]
+                    # roi_nxyz[0][roi_mask_obj1==1] = (roi_nxyz[0][roi_mask_obj1==1] / 255 -0.5)*2
+                    # roi_nxyz[1][roi_mask_obj1==1] = (roi_nxyz[1][roi_mask_obj1==1] / 255 -0.5)*2 
+                    # roi_nxyz[2][roi_mask_obj1==1] = (roi_nxyz[2] [roi_mask_obj1==1]/ 255 -0.5)*2 
+                    # #再单位化
+                    # y=np.linalg.norm(roi_nxyz,axis=0,keepdims=True)
+                    # roi_nxyz[0][roi_mask_obj1==1]=roi_nxyz[0][roi_mask_obj1==1]/y[0][roi_mask_obj1==1]
+                    # roi_nxyz[1][roi_mask_obj1==1]=roi_nxyz[1][roi_mask_obj1==1]/y[0][roi_mask_obj1==1]
+                    # roi_nxyz[2][roi_mask_obj1==1]=roi_nxyz[2][roi_mask_obj1==1]/y[0][roi_mask_obj1==1]
 
                     roi_infos["roi_nxyz"].append(roi_nxyz.astype("float32"))
+                  
                     # dataset_dict["roi_nxyz"]=torch.as_tensor(roi_nxyz.astype("float32")).contiguous()
                     #===============
 
@@ -543,11 +546,11 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
         #     xyz = self.smooth_xyz(xyz)
         mask_obj = ((nxyz[:, :, 0] != 0) | (nxyz[:, :, 1] != 0) | (nxyz[:, :, 2] != 0)).astype(np.bool).astype(np.float32)
         #改变范围
-        nxyz=nxyz.transpose(2,0,1)
-        nxyz[0][mask_obj!=0] = (nxyz[0][mask_obj!=0] / 255 -0.5)*2
-        nxyz[1][mask_obj!=0] = (nxyz[1][mask_obj!=0] / 255 -0.5)*2
-        nxyz[2][mask_obj!=0] = (nxyz[2][mask_obj!=0] / 255 -0.5)*2
-        nxyz=nxyz.transpose(1,2,0)
+        # nxyz=nxyz.transpose(2,0,1)
+        # nxyz[0][mask_obj!=0] = (nxyz[0][mask_obj!=0] / 255 -0.5)*2
+        # nxyz[1][mask_obj!=0] = (nxyz[1][mask_obj!=0] / 255 -0.5)*2
+        # nxyz[2][mask_obj!=0] = (nxyz[2][mask_obj!=0] / 255 -0.5)*2
+        # nxyz=nxyz.transpose(1,2,0)
        
         #=================================== remove xyz
         # if cfg.INPUT.SMOOTH_XYZ:
@@ -662,12 +665,12 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
         # roi_nxyz[1][roi_mask_obj==1] = (roi_nxyz[1][roi_mask_obj!=0] / 255 -0.5)*2 
         # roi_nxyz[2][roi_mask_obj==1] = (roi_nxyz[2] [roi_mask_obj!=0]/ 255 -0.5)*2 
         #再单位化
-        y=np.linalg.norm(roi_nxyz,axis=0,keepdims=True)
+        # y=np.linalg.norm(roi_nxyz,axis=0,keepdims=True)
         #这里求一次mask，因为怀疑不是一样
-        roi_mask_obj1 = ((roi_nxyz[0,:, :,] != 0) | (roi_nxyz[1,:, :] != 0) | (roi_nxyz[2,:, :] != 0)).astype(np.bool).astype(np.float32)
-        roi_nxyz[0][roi_mask_obj1!=0]=roi_nxyz[0][roi_mask_obj1!=0]/y[0][roi_mask_obj1!=0]
-        roi_nxyz[1][roi_mask_obj1!=0]=roi_nxyz[1][roi_mask_obj1!=0]/y[0][roi_mask_obj1!=0]
-        roi_nxyz[2][roi_mask_obj1!=0]=roi_nxyz[2][roi_mask_obj1!=0]/y[0][roi_mask_obj1!=0]
+        # roi_mask_obj1 = ((roi_nxyz[0,:, :,] != 0) | (roi_nxyz[1,:, :] != 0) | (roi_nxyz[2,:, :] != 0)).astype(np.bool).astype(np.float32)
+        # roi_nxyz[0][roi_mask_obj1!=0]=roi_nxyz[0][roi_mask_obj1!=0]/y[0][roi_mask_obj1!=0]
+        # roi_nxyz[1][roi_mask_obj1!=0]=roi_nxyz[1][roi_mask_obj1!=0]/y[0][roi_mask_obj1!=0]
+        # roi_nxyz[2][roi_mask_obj1!=0]=roi_nxyz[2][roi_mask_obj1!=0]/y[0][roi_mask_obj1!=0]
 
         # roi_nxyz[:][roi_mask_obj==1]=roi_nxyz[:][roi_mask_obj==1]/y[0][roi_mask_obj==1]
         

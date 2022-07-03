@@ -24,7 +24,9 @@ class Renderer(object):#弄明白通道和缓冲区的设置
             {
                 GL_COLOR_ATTACHMENT0: gu.Texture(GL_TEXTURE_2D, 1, GL_RGB8, W, H),
                 GL_COLOR_ATTACHMENT1: gu.Texture(GL_TEXTURE_2D, 1, GL_R32F, W, H),
-                GL_COLOR_ATTACHMENT2: gu.Texture(GL_TEXTURE_2D, 1, GL_RGB8, W, H),
+                # GL_COLOR_ATTACHMENT2: gu.Texture(GL_TEXTURE_2D, 1, GL_RGB8, W, H),
+                GL_COLOR_ATTACHMENT2: gu.Texture(GL_TEXTURE_2D, 1,  GL_RGB32F, W, H),
+
                 GL_DEPTH_ATTACHMENT: gu.Renderbuffer(GL_DEPTH_COMPONENT32F, W, H),
             }
         )
@@ -191,7 +193,10 @@ class Renderer(object):#弄明白通道和缓冲区的设置
         depth = np.flipud(depth_flipped).copy()
 
         glNamedFramebufferReadBuffer(self._fbo.id, GL_COLOR_ATTACHMENT2)
-        bgr_flipped = np.frombuffer(glReadPixels(0, 0, W, H, GL_BGR, GL_UNSIGNED_BYTE), dtype=np.uint8).reshape(H, W, 3)
+        # bgr_flipped = np.frombuffer(glReadPixels(0, 0, W, H, GL_BGR, GL_UNSIGNED_BYTE), dtype=np.uint8).reshape(H, W, 3)
+        
+        bgr_flipped = np.frombuffer(glReadPixels(0, 0, W, H, GL_BGR, GL_FLOAT), dtype=np.float32).reshape(H, W, 3)
+        
         bgr_normal = np.flipud(bgr_flipped).copy()
 
         return bgr, depth, bgr_normal

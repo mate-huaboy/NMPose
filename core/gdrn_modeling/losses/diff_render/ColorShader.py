@@ -6,7 +6,7 @@ from pytorch3d.renderer.lighting import PointLights
 from pytorch3d.ops import interpolate_face_attributes
 import datetime
 def normal_shading(
-    meshes, fragments, #lights, cameras, materials, texels
+    meshes, fragments, #cameras,#lights, cameras, materials, texels
 ) -> torch.Tensor:
     """
     Apply per pixel shading. First interpolate the vertex normals and
@@ -26,7 +26,9 @@ def normal_shading(
     """
     # verts = meshes.verts_packed()  # (V, 3)
     faces = meshes.faces_packed()  # (F, 3)
-    vertex_normals = meshes.verts_normals_packed()  # (V, 3)
+    vertex_normals = meshes.verts_normals_packed()  # (V, 3),就是一个tensor
+    
+    # vertex_normals=torch.mm(cameras.R[:],vertex_normals[:,:] )    #先直接用R叭
     # faces_verts = verts[faces]
     faces_normals = vertex_normals[faces]
     # faces_normals=meshes.faces_normals_packed()
@@ -118,7 +120,7 @@ class NormalShader(nn.Module):
             fragments=fragments,
             # texels=texels,
             # lights=lights,
-            # cameras=cameras,
+            #cameras=cameras,
             # materials=materials,
         )
        

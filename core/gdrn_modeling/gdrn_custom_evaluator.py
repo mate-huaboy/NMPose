@@ -184,7 +184,7 @@ class GDRN_EvaluatorCustom(DatasetEvaluator):
                 K = _input["cam"][inst_i].cpu().numpy().copy()
 
                 roi_label = _input["roi_cls"][inst_i]  # 0-based label
-                score = _input["score"][inst_i]
+                score = _input["score"][inst_i]  #这里的score是什么意思
                 roi_label, cls_name = self._maybe_adapt_label_cls_name(roi_label)
                 if cls_name is None:
                     continue
