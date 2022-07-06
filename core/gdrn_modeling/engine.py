@@ -204,12 +204,12 @@ class GDRN_Lite(LightningLite):
             **extra_ckpt_dict,
         )
         start_iter = checkpointer.resume_or_load(cfg.MODEL.WEIGHTS, resume=resume).get("iteration", -1) + 1
-        aa=checkpointer.resume_or_load(cfg.MODEL.WEIGHTS, resume=resume)
-        optimizer.load_state_dict(aa['optimizer']) 
-        scheduler.load_state_dict(aa['scheduler'])
+        # aa=checkpointer.resume_or_load(cfg.MODEL.WEIGHTS, resume=resume)
+        # optimizer.load_state_dict(aa['optimizer']) 
+        # scheduler.load_state_dict(aa['scheduler'])
         
         #如果是最新的训练则从0开始
-        # start_iter=0
+        start_iter=0
         if cfg.SOLVER.CHECKPOINT_BY_EPOCH:
             ckpt_period = cfg.SOLVER.CHECKPOINT_PERIOD * iters_per_epoch
         else:

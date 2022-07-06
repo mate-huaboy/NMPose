@@ -30,7 +30,7 @@ class PyPMLoss(nn.Module):
         disentangle_t=False,
         disentangle_z=False,
         t_loss_use_points=False,
-        symmetric=False,
+        symmetric=False,#注意这个参数
         r_only=False,
     ):
         """
@@ -94,7 +94,7 @@ class PyPMLoss(nn.Module):
         if gt_rots.shape[-1] == 4:
             gt_rots = quat2mat_torch(gt_rots)
 
-        if self.symmetric:  #对称物体需要特殊处理
+        if self.symmetric:  #对称物体需要特殊处理，但是这里并没有考虑
             assert sym_infos is not None
             gt_rots = get_closest_rot_batch(pred_rots, gt_rots, sym_infos=sym_infos)
 

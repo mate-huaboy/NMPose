@@ -23,7 +23,9 @@ from pytorch3d.renderer import (
     SoftSilhouetteShader,
     TexturesVertex,
     BlendParams,
+    
 )
+
 
 # Params
 K = np.array([[572.4114, 0.0, 325.2611], [0.0, 573.57043, 242.04899], [0.0, 0.0, 1.0]])
@@ -37,23 +39,24 @@ w = 640
 
 # Load mesh
 device = torch.device("cuda:0")
-mesh = IO().load_mesh("datasets/BOP_DATASETS/lm/models/obj_000011.ply").to(device)
+mesh = IO().load_mesh("datasets/BOP_DATASETS/lm/models/obj_000014.ply").to(device)
 mesh.scale_verts_(0.001)
 # mesh.scale_verts_(1)
 
 # import ipdb; ipdb.set_trace()
 
 # GT Pose for instance 176
-R = torch.tensor(
-   [[1.0,0,0],[0,1.0,0],[0,0,1.0]],
-    dtype=torch.float32,
-)
-T = torch.tensor([0,0,1], dtype=torch.float32) 
-# R_gt=np.array([0.99917501, -0.0299925, 0.0273719, -0.013194, -0.877334, -0.47969899, 0.0384017, 0.47894201, -0.87700599]).reshape(3,3)
-# t_gt=np.array( [-1.64189978, -81.29900694, 1029.99741383]).reshape(1,3)/1000
-# R=torch.tensor(R_gt)
-# T=torch.tensor(t_gt)
-sys_T=np.array([-0.999633, 0.026679, 0.00479336, -0.262139, -0.0266744, -0.999644, 0.00100504, -0.197966, 0.00481847, 0.000876815, 0.999988, 0.0321652, 0, 0, 0, 1] ).reshape(4,4)
+# R = torch.tensor(
+#    [[1.0,0,0],[0,1.0,0],[0,0,1.0]],
+#     dtype=torch.float32,
+# )
+# T = torch.tensor([0,0,1], dtype=torch.float32) 
+R_gt=np.array( [-0.175483, 0.98447901, 0.00246469, 0.89255601, 0.160153, -0.42153901, -0.415391, -0.0717731, -0.90680701]).reshape(3,3)
+t_gt=np.array(  [107.21688293, -45.40241317, 1014.50072417]).reshape(1,3)/1000
+R=torch.tensor(R_gt)
+T=torch.tensor(t_gt)
+
+sys_T=np.array([-0.999964, -0.00333777, -0.0077452, 0.232611, 0.00321462, -0.999869, 0.0158593, 0.694388, -0.00779712, 0.0158338, 0.999844, -0.0792063, 0, 0, 0, 1] ).reshape(4,4)
 sys_T=torch.tensor(sys_T,dtype=torch.float32)
 # Apply fix #294
 RT = torch.zeros((4, 4))
@@ -61,16 +64,34 @@ RT[3, 3] = 1
 RT[:3, :3] = R
 RT[:3, 3] = T
 
-RT1=torch.matmul(RT,sys_T)
 
-Rz = torch.tensor([[-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]).float()
+Rz = torch.tensor([[-1, 0, 0, 0], [0, -1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]).float()  #转到pytorch3d坐标系下
+RT1=torch.matmul(RT,sys_T)
 
 RT = torch.matmul(Rz, RT)
 RT1=torch.matmul(Rz,RT1)
+
+
+# R1 = RT1[:3, :3].reshape(1, 3, 3)
+
+# T1 = RT1[:3, 3].reshape(1, 3)
+# R = RT[:3, :3].reshape(1, 3, 3)
+# T = RT[:3, 3].reshape(1, 3)
+
+
 R1 = RT1[:3, :3].t().reshape(1, 3, 3)
+
 T1 = RT1[:3, 3].reshape(1, 3)
 R = RT[:3, :3].t().reshape(1, 3, 3)
 T = RT[:3, 3].reshape(1, 3)
+# RT1=torch.matmul(RT,sys_T)
+
+# RT1[:3,:3]=R
+# RT1[:3,3]=T
+# R1=RT1[:3,:3].reshape(1, 3, 3)
+# T1=RT1[:3,3].reshape(1, 3)
+
+
 
 f = torch.tensor((f_x, f_y), dtype=torch.float32).unsqueeze(0)
 p = torch.tensor((p_x, p_y), dtype=torch.float32).unsqueeze(0)
@@ -91,7 +112,7 @@ camera = PerspectiveCameras(
     R=R, T=T, focal_length=f, principal_point=p, image_size=((h, w),), device=device,in_ndc=False
 )
 camera1 = PerspectiveCameras(
-    R=R1, T=T1, focal_length=f, principal_point=p, image_size=((h, w),), device=device,in_ndc=False
+    R=R1, T=T, focal_length=f, principal_point=p, image_size=((h, w),), device=device,in_ndc=False
 )
 T2 = torch.tensor([0.25, 0, 1], dtype=torch.float32,device="cuda:0") 
 T2=T2.view(1,3)
@@ -127,12 +148,12 @@ renderer = MeshRenderer(
 # Generate rendered image
 target_images = renderer(mesh, cameras=camera, lights=lights)
 mesh_nv=mesh.verts_normals_list()[0]
-nv=R.view(1,3,3)@mesh_nv[...,None] 
+nv=R.view(3,3).t().view(1,3,3)@mesh_nv[...,None] 
 nv.squeeze_()
 nv=nv[None]
 mesh1=Meshes(verts=mesh.verts_list(),faces=mesh.faces_list(),verts_normals=nv)
 target_images = renderer(mesh1, cameras=camera)
-nv1=R1.view(1,3,3)@mesh_nv[...,None] 
+nv1=R1.view(3,3).t().view(1,3,3)@mesh_nv[...,None] 
 nv1.squeeze_()
 nv1=nv1[None]
 mesh2=Meshes(verts=mesh.verts_list(),faces=mesh.faces_list(),verts_normals=nv1)
@@ -155,11 +176,19 @@ img_2551 = (img1.cpu().numpy() * 255)
 img_2552=(img2.cpu().numpy() * 255)
 
 z=img_255[...,2]
-print(np.sum(z>0))
+
+imwrite("zb0.png",z*(z>0))
+z1=img_2551[...,2]
+
+imwrite("zb01.png",z1*(z1>0))
+
 y=img_255[...,1]
 y_bigger0=y>0
 y_bigegr=y*y_bigger0
 imwrite("yb0.png",y_bigegr)
+x=img_255[...,1]
+imwrite("xb0.png",x*(x>0))
+
 y_smaller0=y<0
 
 imwrite("ysmall.png",-y*y_smaller0)
@@ -172,7 +201,7 @@ imwrite("ysmall1.png",-y*y_smaller0)
 
 
 imwrite("diff_render.png",img_255-img_2551)
-cv2.imwrite("jfj.png",np.squeeze(img.cpu().numpy()*255))
+cv2.imwrite("jfj.png",np.clip(np.squeeze(img.cpu().numpy()*255),0,255))
 cv2.imwrite("jfj2.png",np.squeeze(img1.cpu().numpy()*255))
 cv2.imwrite("jfj3.png",np.squeeze(img2.cpu().numpy()*255))
 

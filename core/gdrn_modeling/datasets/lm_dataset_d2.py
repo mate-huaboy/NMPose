@@ -182,7 +182,7 @@ class LM_Dataset(object):
                         "pose": pose,
                         "quat": quat,
                         "trans": t,
-                        "centroid_2d": proj,  # absolute (cx, cy)
+                        "centroid_2d": proj,  # absolute (cx, cy),获取真实中心
                         "segmentation": mask_rle,
                         "mask_full_file": mask_file,  # TODO: load as mask_full, rle
                     }

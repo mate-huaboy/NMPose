@@ -111,11 +111,12 @@ class PyrotLoss:
         img_normal_gt=img_normal[24:]
         # mask=((img_normal_gt[...,:1]!=0)|(img_normal_gt[...,1:2]!=0)|(img_normal_gt[...,2:]!=0))
         # mask=torch.squeeze(mask)
-        # pre_i=img_normal_pre[0].detach().cpu().numpy()*255
-        # gt_i=img_normal_gt[0].detach().cpu().numpy()*255
-
-        # cv2.imwrite("a.png",pre_i)
-        # cv2.imwrite("b.png",gt_i)
+        # pre_i=img_normal_pre[1].detach().cpu().numpy()*255
+        # gt_i=img_normal_gt[1].detach().cpu().numpy()*255
+        # zb0=pre_i[...,2]>0
+        # gt_zb0=gt_i[...,2]>0
+        # cv2.imwrite("a.png",pre_i*zb0[...,None])
+        # cv2.imwrite("b.png",gt_i*gt_zb0[...,None])#渲染错误
 
                
 

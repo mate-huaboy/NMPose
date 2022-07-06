@@ -60,14 +60,8 @@ sys_T=np.array([-0.999964, -0.00333777, -0.0077452, 0.232611, 0.00321462, -0.999
 
 R_gt=np.array([0.99917501, -0.0299925, 0.0273719, -0.013194, -0.877334, -0.47969899, 0.0384017, 0.47894201, -0.87700599]).reshape(3,3)
 t_gt1=np.array( [-1.64189978, -81.29900694, 1029.99741383]).reshape(1,3)/1000
-R_gt=np.array(  [
-        [0.66307002, 0.74850100, 0.00921593],
-        [0.50728703, -0.44026601, -0.74082798],
-        [-0.55045301, 0.49589601, -0.67163098],
-    ],).reshape(3,3)
-
-# R_gt=np.array([[1.0,0,0],[0,1.0,0],[0,0,1.0]])
-t_gt=np.array([0,0,1])
+R_gt=np.array([0.99917501, -0.0299925, 0.0273719, -0.013194, -0.877334, -0.47969899, 0.0384017, 0.47894201, -0.87700599]).reshape(3,3)
+t_gt=np.array( [-1.64189978, -81.29900694, 1029.99741383]).reshape(1,3)/1000
 data_dir = osp.normpath(osp.join(PROJ_ROOT, "datasets/BOP_DATASETS/lm/test"))
 
 cls_indexes = sorted(idx2class.keys())
@@ -88,12 +82,14 @@ def get_renderer():
 
 
 
-bgr_gl1, depth_gl,nomal_img1 = get_renderer().render(9, IM_W, IM_H, K, R_gt, t_gt, near, far)#如果固定t则如何呢
+bgr_gl1, depth_gl,nomal_img1 = get_renderer().render(6, IM_W, IM_H, K, R_gt, t_gt, near, far)#如果固定t则如何呢
 nomal_img1=nomal_img1*255
+#变成rgb
+nomal_img1=nomal_img1[...,::-1]
 cv2.imwrite("be.png",nomal_img1)
 R=R_gt.dot(sys_T[:3,:3])
 # R=sys_T[:3,:3].dot(R_gt)
-print(R.dot(R.transpose()))
+
 bgr_gl2, depth_gl,nomal_img2 = get_renderer().render(9, IM_W, IM_H, K, R, t_gt, near, far)#如果固定t则如何呢
 bgr_gl3, depth_gl,nomal_img3 = get_renderer().render(9, IM_W, IM_H, K, R, t_gt1, near, far)#如果固定t则如何呢
 

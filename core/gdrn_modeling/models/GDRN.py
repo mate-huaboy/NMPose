@@ -147,17 +147,17 @@ class GDRN(nn.Module):
         if r_head_cfg.ENABLED and self.concat:
             # joints.shape [bs, 1152, 64, 64]
                 mask, coor_x, coor_y, coor_z, region = self.rot_head_net(features, x_f64, x_f32, x_f16)
-                coor_feat = torch.cat([coor_x, coor_y, coor_z], dim=1)  # BCHW
+                # coor_feat = torch.cat([coor_x, coor_y, coor_z], dim=1)  # BCHW
              #归一化
-                coor_feat=F.normalize(coor_feat,p=2,dim=1)
-                #归一化
-                coor_feat=F.normalize(coor_feat,p=2,dim=1)
-                coor_x=coor_feat[:,0,]
-                coor_x=coor_x[:,None]
-                coor_y=coor_feat[:,1,:,:]
-                coor_y=coor_y[:,None]
-                coor_z=coor_feat[:,2,:,:]
-                coor_z=coor_z[:,None]
+                # coor_feat=F.normalize(coor_feat,p=2,dim=1)
+                # #归一化
+                # coor_feat=F.normalize(coor_feat,p=2,dim=1)
+                # coor_x=coor_feat[:,0,]
+                # coor_x=coor_x[:,None]
+                # coor_y=coor_feat[:,1,:,:]
+                # coor_y=coor_y[:,None]
+                # coor_z=coor_feat[:,2,:,:]
+                # coor_z=coor_z[:,None]
         elif r_head_cfg.ENABLED and not self.concat:
             mask, coor_x, coor_y, coor_z, region = self.rot_head_net(features)
             # coor_feat = torch.cat([coor_x, coor_y, coor_z], dim=1)  # BCHW
@@ -173,11 +173,22 @@ class GDRN(nn.Module):
             coor_x=gt_xyz[:,0:1]
             coor_y=gt_xyz[:,1:2]
             coor_z=gt_xyz[:,2:3]
-            # mask=gt_mask_visib
-            # mask=mask[:,None]
+            mask=gt_mask_visib
+            mask=mask[:,None]
             region=None
 
-       
+            
+        coor_feat = torch.cat([coor_x, coor_y, coor_z], dim=1)
+        coor_feat=F.normalize(coor_feat,p=2,dim=1)
+
+        #加上乘上mask
+        yy1=(coor_feat[:,0]*mask[:,0])[:,None]
+        yy2=(coor_feat[:,1]*mask[:,0])[:,None]
+        yy3=(coor_feat[:,2]*mask[:,0])[:,None]
+        # yy1=(coor_feat[:,0]*gt_mask_visib[:,None][:,0])[:,None]
+        # yy2=(coor_feat[:,1]*gt_mask_visib[:,None][:,0])[:,None]
+        # yy3=(coor_feat[:,2]*gt_mask_visib[:,None][:,0])[:,None]
+        coor_feat = torch.cat([yy1, yy2, yy3], dim=1)
          #first eti translate
         device = x.device
         pred_t_only = self.trans_head_net(features)
@@ -190,35 +201,23 @@ class GDRN(nn.Module):
         #移动到中心
         #需要已知原来的缩放比例，现在的中心，以及现在的深度，使用的插值方法等
         #now 这个过程可以反向传播，如有需要的话,首先先不考虑法线中心的反向传播吧，怕被影响
-                pred_trans_temp,cent_temp = trans_from_pred_centroid_z(
-                    # pred_centroids=pred_t_only[:, :2],
-                    # pred_z_vals=pred_t_only[:, 2:3],  # must be [B, 1]
-                    pred_centroids=gt_trans_ratio[:, :2],
-                    pred_z_vals=gt_trans_ratio[:, 2:3],  # must be [B, 1]
-                    roi_cams=roi_cams,
-                    roi_centers=roi_centers,
-                    resize_ratios=resize_ratios,
-                    roi_whs=roi_whs,
-                    eps=1e-4,
-                    is_allo="allo" in pnp_net_cfg.ROT_TYPE,
-                    z_type=pnp_net_cfg.Z_TYPE,
-                    # is_train=True
-                    is_train=do_loss,  # TODO: sometimes we need it to be differentiable during test
-                )
+                # pred_trans_temp,cent_temp = trans_from_pred_centroid_z(
+                #     pred_centroids=pred_t_only[:, :2],
+                #     pred_z_vals=pred_t_only[:, 2:3],  # must be [B, 1]
+                #     # pred_centroids=gt_trans_ratio[:, :2],
+                #     # pred_z_vals=gt_trans_ratio[:, 2:3],  # must be [B, 1]
+                #     roi_cams=roi_cams,
+                #     roi_centers=roi_centers,
+                #     resize_ratios=resize_ratios,
+                #     roi_whs=roi_whs,
+                #     eps=1e-4,
+                #     is_allo="allo" in pnp_net_cfg.ROT_TYPE,
+                #     z_type=pnp_net_cfg.Z_TYPE,
+                #     # is_train=True
+                #     is_train=do_loss,  # TODO: sometimes we need it to be differentiable during test
+                # )
                 #默认缩放倍数
-                s=1.5
-                Ms=[]
-                coor_feat = torch.cat([coor_x, coor_y, coor_z], dim=1)
-                # coor_feat=F.normalize(coor_feat,p=2,dim=1)
-
-                #加上乘上mask
-                yy1=(coor_feat[:,0]*mask[:,0])[:,None]
-                yy2=(coor_feat[:,1]*mask[:,0])[:,None]
-                yy3=(coor_feat[:,2]*mask[:,0])[:,None]
-                # yy1=(coor_feat[:,0]*gt_mask_visib[:,None][:,0])[:,None]
-                # yy2=(coor_feat[:,1]*gt_mask_visib[:,None][:,0])[:,None]
-                # yy3=(coor_feat[:,2]*gt_mask_visib[:,None][:,0])[:,None]
-                coor_feat = torch.cat([yy1, yy2, yy3], dim=1)
+           
                 # coor_feat=F.normalize(coor_feat,p=2,dim=1)
 
 
@@ -228,7 +227,10 @@ class GDRN(nn.Module):
                 # aa=coor_feat[0].cpu().numpy().transpose(1,2,0)
                 # cv2.imwrite("b.png",coor_feat[0].cpu().numpy().transpose(1,2,0)*255)
 
-                for t,c,wh in zip(pred_trans_temp,cent_temp,roi_whs):
+                # for t,c,wh in zip(pred_trans_temp,cent_temp,roi_whs):
+                Ms=[]
+                for c,wh in zip(pred_t_only[:, :2],roi_whs):
+
                     # risio=wh[0]/64/s*t[2]/1
                     risio=1
                     # bbox_center = np.array([32, 32])+c/wh[0]*64#cal by myself
@@ -237,7 +239,9 @@ class GDRN(nn.Module):
                     # bbox_center = np.array([32, 32])+cent_temp[0]/whs[0][0]*64#cal by myself
 
                     # bbox_center=bbox_center.numpy()#need to cpu not good
-                    dalta_center=c/wh[0]*64
+                    # dalta_center=c/wh[0]*64
+                    dalta_center=c*64
+
                     # trans=get_affine_transform(bbox_center,(64/risio,64/risio),0,64)  #把这里改掉
                     trans=torch.tensor(np.identity(3),device="cuda:0",dtype=torch.float32)
                     trans[0:2,-1]=dalta_center
@@ -294,13 +298,12 @@ class GDRN(nn.Module):
                 #
                 
 
-                #为了方便调试，输出查看图片其实没有必要
-                coor_x=coor_feat[:,0,]
-                coor_x=coor_x[:,None]
-                coor_y=coor_feat[:,1,:,:]
-                coor_y=coor_y[:,None]
-                coor_z=coor_feat[:,2,:,:]
-                coor_z=coor_z[:,None]
+        coor_x=coor_feat[:,0,]
+        coor_x=coor_x[:,None]
+        coor_y=coor_feat[:,1,:,:]
+        coor_y=coor_y[:,None]
+        coor_z=coor_feat[:,2,:,:]
+        coor_z=coor_z[:,None]
 
                     
                 # coor_feat=F.normalize(coor_feat,p=2,dim=1)
@@ -316,7 +319,7 @@ class GDRN(nn.Module):
 
         # TODO: remove this trans_head_net
         # trans = self.trans_head_net(features)
-
+        # cv2.imwrite("real_img.png",x[1].cpu().numpy().transpose(1,2,0)*255)
         
         bs = x.shape[0]
         num_classes = r_head_cfg.NUM_CLASSES

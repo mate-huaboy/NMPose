@@ -39,7 +39,7 @@ class LM_PBR_Dataset:
 
         self.dataset_root = data_cfg.get("dataset_root", osp.join(DATASETS_ROOT, "BOP_DATASETS/lm/train_pbr"))
         self.xyz_root = data_cfg.get("xyz_root", osp.join(self.dataset_root, "xyz_crop"))
-        self.nxyz_root = data_cfg.get("xyz_root", osp.join(self.dataset_root, "nxyz_crop"))
+        self.nxyz_root = data_cfg.get("nxyz_root", osp.join(self.dataset_root, "nxyz_crop"))
 
         assert osp.exists(self.dataset_root), self.dataset_root
         self.models_root = data_cfg["models_root"]  # BOP_DATASETS/lm/models

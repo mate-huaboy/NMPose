@@ -29,12 +29,6 @@ class DiffRender(nn.Module):
             self.mesh = IO().load_mesh(mesh_path)
         elif mesh_path.endswith('.obj'):
             pass
-        self.cam_opencv2pytch3d = torch.tensor(
-            [[-1, 0, 0, 0],
-             [0, -1, 0, 0],
-             [0, 0, 1, 0],
-             [0, 0, 0, 1]], dtype=torch.float32
-        )
 
         self.raster_settings = RasterizationSettings(
             image_size=render_image_size,
@@ -61,7 +55,7 @@ class DiffRender(nn.Module):
             device = args[0]
         super().to(device)
        
-        self.cam_opencv2pytch3d=self.cam_opencv2pytch3d.to(device)
+        # self.cam_opencv2pytch3d=self.cam_opencv2pytch3d.to(device)
         self.renderer=self.renderer.to(device)
      
 
@@ -76,18 +70,18 @@ class DiffRender(nn.Module):
             near (float, optional):  Defaults to 0.1.
             far (int, optional): Defaults to 6.
         """
-        start=datetime.datetime.now()
+        
         B = T.shape[0]
   
 
         device = T.device
-        T=T[...,:3,:3]  #add
-        T = self.cam_opencv2pytch3d[:3,:3] @ T
+        # T=T[...,:3,:3]  #add
+        # T = self.cam_opencv2pytch3d[:3,:3] @ T
 
 
         ## X_cam = X_world R + t
-        R = T[..., :3, :3].transpose(-1, -2)
-        t=self.cam_opencv2pytch3d[:3,:3]@torch.tensor([0,0,1],device=T.device,dtype=torch.float32).reshape(3,1)
+        # R = T[..., :3, :3].transpose(-1, -2)
+        t=torch.tensor([0,0,1],device=T.device,dtype=torch.float32).reshape(3,1)
         t=t.reshape(1,3)
         t=t.repeat(B,1)
       
@@ -95,7 +89,7 @@ class DiffRender(nn.Module):
         #                              principal_point=K[:, :2, 2], image_size=[render_image_size] * B, in_ndc=False,
         #                              device=device)# why not use R and t
         principal_p=(render_image_size[0]/2,render_image_size[1]/2)
-        cameras = PerspectiveCameras(R=R,T=t,focal_length=torch.stack([K[:, 0, 0], K[:, 1, 1]], dim=-1),
+        cameras = PerspectiveCameras(R=T,T=t,focal_length=torch.stack([K[:, 0, 0], K[:, 1, 1]], dim=-1),
                                      principal_point=[principal_p] * B, image_size=[render_image_size] * B, in_ndc=False,
                                      device=device)# why not use R and t
         
@@ -123,13 +117,26 @@ class DiffRenderer_Normal_Wrapper(nn.Module):
 
         self.renderers = nn.ModuleList(self.renderers)
         self.cls2idx = None  # updated outside
+        self.cam_opencv2pytch3d = torch.tensor(
+            [[-1, 0, 0, 0],
+             [0, -1, 0, 0],
+             [0, 0, 1, 0],
+             [0, 0, 0, 1]], dtype=torch.float32,device="cuda:0"
+        )
+
     def forward(self, model_names, T,gt_T, K, render_image_size, near=0.1, far=6, render_tex=False):
+        #转到pytorch3d坐标系下
+        T = self.cam_opencv2pytch3d[:3,:3] @ T
+      
+        gt_T = self.cam_opencv2pytch3d[:3,:3] @ gt_T
 
         normal_outputs = []
         # uniq=torch.unique(model_names)
         V_l=[]
         F_l=[]
         v_n_l=[]
+        v_n_l2=[]
+
         for b, _ in enumerate(model_names):
             # model_idx = self.cls2idx[model_names[b]]
             # model_idx=uniq[b]
@@ -144,16 +151,25 @@ class DiffRenderer_Normal_Wrapper(nn.Module):
             V_l.append(m.verts_list()[0])
             F_l.append( m.faces_list()[0])
             v_n=m.verts_normals_list()[0]
-            v_n=T[b].view(1,3,3)@v_n[...,None]  #这里的T是不是要转到pytorch3d的坐标系下呢？
-            v_n_l.append( v_n.squeeze_())
+            v_n1=T[b].view(1,3,3)@v_n[...,None]  #这里的T是不是要转到pytorch3d的坐标系下呢？
+            v_n_l.append( v_n1.squeeze_())
+            v_n=gt_T[b].view(1,3,3)@v_n[...,None]  #这里的T是不是要转到pytorch3d的坐标系下呢？
+            v_n_l2.append( v_n.squeeze_())
+
 
         mesh = Meshes(
             verts=V_l,faces=F_l,verts_normals=v_n_l
         )
+        T = T[..., :3, :3].transpose(-1, -2)
+        gt_T = gt_T[..., :3, :3].transpose(-1, -2)
+
         mesh.verts_normals_list
         normal_pre = self.renderers[0](T, K, mesh,render_image_size,
                                                     near, far,render_texture=render_tex)
+        mesh = Meshes(
+            verts=V_l,faces=F_l,verts_normals=v_n_l2
+        )
         normal_gt=self.renderers[0](gt_T, K, mesh,render_image_size,
-                                                    near, far,render_texture=render_tex)
+                                                    near, far,render_texture=render_tex)#这个gt_T也需要相应的mash
         normal=torch.cat([normal_pre,normal_gt],dim=0)
         return normal
