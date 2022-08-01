@@ -409,7 +409,7 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
                     roi_infos["score"].append(inst_infos["score"])  #去掉分数又如何，这里需要修改=====
                 else:
                     #真实时直接将分数设为1，目前还不清楚这里的分数有什么用
-                    roi_infos["score"].append(1)
+                    roi_infos["score"].append(1) 
                 # extent
                 roi_extent = self._get_extents(dataset_name)[roi_cls]
                 roi_infos["roi_extent"].append(roi_extent)
