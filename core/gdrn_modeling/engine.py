@@ -208,7 +208,7 @@ class GDRN_Lite(LightningLite):
         # optimizer.load_state_dict(aa['optimizer']) 
         # scheduler.load_state_dict(aa['scheduler'])
         
-        #如果是最新的训练则从0开始
+        # 如果是最新的训练则从0开始
         start_iter=0
         if cfg.SOLVER.CHECKPOINT_BY_EPOCH:
             ckpt_period = cfg.SOLVER.CHECKPOINT_PERIOD * iters_per_epoch

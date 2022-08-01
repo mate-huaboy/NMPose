@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from mmcv.runner import load_checkpoint
+from vispy import sys_info
 from detectron2.utils.events import get_event_storage
 from core.utils.pose_utils import quat2mat_torch
 from core.utils.rot_reps import ortho6d_to_mat_batch
@@ -20,9 +21,12 @@ from .cdpn_trans_head import TransHeadNet
 from core.utils.data_utils import  get_affine_transform,crop_resize_by_warp_affine
 import cv2
 
+from core.utils.pose_utils import get_closest_rot_batch
+
+
 # pnp net variants
 from .conv_pnp_net import ConvPnPNet
-from .model_utils import compute_mean_re_te, get_mask_prob
+from .model_utils import compute_mean_re_te, compute_mean_re_te_sym, get_mask_prob
 from .point_pnp_net import PointPnPNet, SimplePointPnPNet
 from .pose_from_pred import pose_from_pred
 from .pose_from_pred_centroid_z import pose_from_pred_centroid_z,trans_from_pred_centroid_z
@@ -123,7 +127,7 @@ class GDRN(nn.Module):
         roi_cams=None,
         roi_centers=None,
         roi_whs=None,
-        roi_extents=None,
+        roi_extents=None,  #这是什么东西
         resize_ratios=None,
         do_loss=False,
     ):
@@ -180,18 +184,20 @@ class GDRN(nn.Module):
             
         coor_feat = torch.cat([coor_x, coor_y, coor_z], dim=1)
         coor_feat=F.normalize(coor_feat,p=2,dim=1)
-
-        #加上乘上mask
-        yy1=(coor_feat[:,0]*mask[:,0])[:,None]
-        yy2=(coor_feat[:,1]*mask[:,0])[:,None]
-        yy3=(coor_feat[:,2]*mask[:,0])[:,None]
-        # yy1=(coor_feat[:,0]*gt_mask_visib[:,None][:,0])[:,None]
-        # yy2=(coor_feat[:,1]*gt_mask_visib[:,None][:,0])[:,None]
-        # yy3=(coor_feat[:,2]*gt_mask_visib[:,None][:,0])[:,None]
-        coor_feat = torch.cat([yy1, yy2, yy3], dim=1)
+        if pnp_net_cfg.ENABLE and not pnp_net_cfg.FREEZE:#需要乘这个mask吗，需要考察，因为遮挡
+            #加上乘上mask
+            yy1=(coor_feat[:,0]*mask[:,0])[:,None]
+            yy2=(coor_feat[:,1]*mask[:,0])[:,None]
+            yy3=(coor_feat[:,2]*mask[:,0])[:,None]
+            # yy1=(coor_feat[:,0]*gt_mask_visib[:,None][:,0])[:,None]
+            # yy2=(coor_feat[:,1]*gt_mask_visib[:,None][:,0])[:,None]
+            # yy3=(coor_feat[:,2]*gt_mask_visib[:,None][:,0])[:,None]
+            coor_feat = torch.cat([yy1, yy2, yy3], dim=1)
          #first eti translate
         device = x.device
-        pred_t_only = self.trans_head_net(features)
+        
+        if t_head_cfg.ENABLED:
+            pred_t_only = self.trans_head_net(features)
         if pnp_net_cfg.R_ONLY and pnp_net_cfg.CENTER_TRANS and pnp_net_cfg.ENABLE:  # override trans pred,fisrt step need not run 
             #gaga
             #加上可微操作
@@ -458,7 +464,7 @@ class GDRN(nn.Module):
             out_dict={"mask":mask, "coor_x":coor_x, "coor_y":coor_y, "coor_z":coor_z,"region": region,}
             
 
-            mean_re, mean_te = compute_mean_re_te(pred_trans, pred_ego_rot, gt_trans, gt_ego_rot)
+            mean_re, mean_te = compute_mean_re_te_sym(pred_trans, pred_ego_rot, gt_trans, gt_ego_rot,sym_infos)
             vis_dict = {
                 "vis/error_R": mean_re,
                 "vis/error_t": mean_te * 100,  # cm
@@ -594,13 +600,13 @@ class GDRN(nn.Module):
                 #归一化
                 # coor_feat=F.normalize(coor_feat,p=2,dim=1)
                 cos_simi=F.cosine_similarity(coor_feat,gt_xyz,dim=1)
-                # cos_simi=cos_simi*gt_mask_xyz#需要乘以mask（刚加上，但还未验证）
+                cos_simi=cos_simi*gt_mask_xyz#需要乘以mask（刚加上，但还未验证）,是否要和被遮挡的问题联系起来，很重要
                 # a=cos_simi[0].detach().cpu().numpy()*255
                 # cv2.imwrite("cossim.png",cos_simi[0].detach().cpu().numpy()*255)
 
                 # cos_simi=cos_simi#需要乘以mask（刚加上，但还未验证）
-                mask=(cos_simi!=0)
-                cos_simi=cos_simi.sum()/mask.sum()#这样就比一大了
+                # mask=(cos_simi!=0)
+                cos_simi=cos_simi.sum()/gt_mask_xyz.sum()#这样就比一大了
                 # cos_simi=cos_simi.sum()/gt_mask_xyz.sum().float().clamp(min=1.0)#这样就比一大了
                 cos_simi=cos_simi.arccos()
                 # print(cos_simi)
@@ -687,7 +693,47 @@ class GDRN(nn.Module):
             if pnp_net_cfg.PM_LW > 0:
                 
                 if pnp_net_cfg.PM_LOSS_TYPE=="normal_loss":
-                    loss_pm_dict= self.rot_normalLoss.get_rot_normal_loss(out_rot,gt_rot,roi_classes,None,roi_cams)
+                    
+                    sym_list=[]
+                    error_not_sym_list=[]
+                    for i,sym in enumerate(sym_infos) :
+                        if  sym is  None:
+                            error_not_sym_list.append(i)
+                        else:
+                            sym_list.append(i)
+                           
+                    
+                    #只评估对称物体===========================
+                    if len(sym_list)!=0:      
+                        loss_normal_dict= self.rot_normalLoss.get_rot_normal_loss(out_rot[sym_list],gt_rot[sym_list],roi_classes[sym_list],None,roi_cams[sym_list])
+                        loss_dict.update(loss_normal_dict)#向字典中加入字典
+
+                    if len(error_not_sym_list)!=0:
+                     #求非对称的损失函数==============================
+                        loss_func = PyPMLoss(#看这里的误差计算,融合预测旋转和平移是还包括了平移在3d点上的 误差评估？
+                                        loss_type=pnp_net_cfg.PM_LOSS_TYPE,
+                                        beta=pnp_net_cfg.PM_SMOOTH_L1_BETA,
+                                        reduction="mean",
+                                        loss_weight=pnp_net_cfg.PM_LW,
+                                        norm_by_extent=pnp_net_cfg.PM_NORM_BY_EXTENT,
+                                        symmetric=False,#改为false
+                                        disentangle_t=pnp_net_cfg.PM_DISENTANGLE_T,
+                                        disentangle_z=pnp_net_cfg.PM_DISENTANGLE_Z,
+                                        t_loss_use_points=pnp_net_cfg.PM_T_USE_POINTS,
+                                        r_only=pnp_net_cfg.PM_R_ONLY,
+                                    )
+                        loss_pm_dict = loss_func(
+                            pred_rots=out_rot[error_not_sym_list],
+                            gt_rots=gt_rot[error_not_sym_list],
+                            points=gt_points[error_not_sym_list],
+                            pred_transes=out_trans[error_not_sym_list],
+                            gt_transes=gt_trans[error_not_sym_list],
+                            extents=extents[error_not_sym_list],#不知道这是什么
+                            sym_infos=sym_infos,
+                        )
+                        loss_dict.update(loss_pm_dict)#向字典中加入字典
+                #============================================================================
+
                 else:
                     assert (gt_points is not None) and (gt_trans is not None) and (gt_rot is not None)
                     loss_func = PyPMLoss(#看这里的误差计算,融合预测旋转和平移是还包括了平移在3d点上的 误差评估？
@@ -711,7 +757,7 @@ class GDRN(nn.Module):
                         extents=extents,
                         sym_infos=sym_infos,
                     )
-                loss_dict.update(loss_pm_dict)#向字典中加入字典
+                    loss_dict.update(loss_pm_dict)#向字典中加入字典
 
             # rot_loss ----------
             if pnp_net_cfg.ROT_LW > 0:#这样无法解决对称问题,但是看论文没有这一部分损失函数啊,并没有使用
@@ -723,8 +769,8 @@ class GDRN(nn.Module):
                     raise ValueError(f"Unknown rot loss type: {pnp_net_cfg.ROT_LOSS_TYPE}")
                 loss_dict["loss_rot"] *= pnp_net_cfg.ROT_LW
 
-        # centroid loss -------------这里最好改一下，改成平移net freeze的时候就不要跑这一段
-        if pnp_net_cfg.CENTROID_LW > 0:
+        # centroid loss -------------这里最好改一下，改成平移net freeze的时候就不要跑这一段，尽管不会反向传播
+        if pnp_net_cfg.CENTROID_LW > 0 and not t_head_cfg.FREEZE:
             assert (
                 pnp_net_cfg.TRANS_TYPE == "centroid_z"
             ), "centroid loss is only valid for predicting centroid2d_rel_delta"
@@ -740,7 +786,8 @@ class GDRN(nn.Module):
             loss_dict["loss_centroid"] *= pnp_net_cfg.CENTROID_LW
 
         # z loss ------------------
-        if pnp_net_cfg.Z_LW > 0:
+        #这里最好也改一下，平移net freeze的时候不要走这一段
+        if pnp_net_cfg.Z_LW > 0 and not t_head_cfg.FREEZE:
             if pnp_net_cfg.Z_TYPE == "REL":
                 gt_z = gt_trans_ratio[:, 2]
             elif pnp_net_cfg.Z_TYPE == "ABS":
@@ -903,7 +950,7 @@ def build_model_optimizer(cfg):
         # translation head net --------------------------------------------------------
         if not t_head_cfg.ENABLED:
             trans_head_net = None
-            assert not pnp_net_cfg.R_ONLY, "if pnp_net is R_ONLY, trans_head must be enabled!"
+            # assert not pnp_net_cfg.R_ONLY, "if pnp_net is R_ONLY, trans_head must be enabled!"
         else:
             trans_head_net = TransHeadNet(
                 channels[-1],  # the channels of backbone output layer

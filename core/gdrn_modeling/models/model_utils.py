@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from lib.pysixd.pose_error import re, te
+from lib.pysixd.pose_error import re, re_sym, re_sym_array, te
 
 
 def get_2d_coord(bs, width, height, dtype=torch.float32, device="cuda"):
@@ -53,5 +53,25 @@ def compute_mean_re_te(pred_transes, pred_rots, gt_transes, gt_rots):
     T_errs = np.zeros((bs,), dtype=np.float32)
     for i in range(bs):
         R_errs[i] = re(pred_rots[i], gt_rots[i])
+        T_errs[i] = te(pred_transes[i], gt_transes[i])
+    return R_errs.mean(), T_errs.mean()
+
+
+
+def compute_mean_re_te_sym(pred_transes, pred_rots, gt_transes, gt_rots,sym_info):
+    pred_transes = pred_transes.detach().cpu().numpy()
+    pred_rots = pred_rots.detach().cpu().numpy()
+    gt_transes = gt_transes.detach().cpu().numpy()
+    gt_rots = gt_rots.detach().cpu().numpy()
+   
+
+    bs = pred_rots.shape[0]
+    R_errs = np.zeros((bs,), dtype=np.float32)
+    T_errs = np.zeros((bs,), dtype=np.float32)
+    for i in range(bs):
+        if sym_info[i] is not None:
+            R_errs[i] = re_sym_array(pred_rots[i], gt_rots[i],sym_info[i])
+        else:
+            R_errs[i] = re(pred_rots[i], gt_rots[i])
         T_errs[i] = te(pred_transes[i], gt_transes[i])
     return R_errs.mean(), T_errs.mean()

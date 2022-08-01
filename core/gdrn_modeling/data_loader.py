@@ -368,7 +368,7 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
         if self.split != "train":
             # don't load annotations at test time
             test_bbox_type = cfg.TEST.TEST_BBOX_TYPE
-            if test_bbox_type == "gt":
+            if test_bbox_type == "gt":   #使用真实的bbox
                 bbox_key = "bbox"
             else:
                 bbox_key = f"bbox_{test_bbox_type}"
@@ -405,8 +405,11 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
 
                 roi_cls = inst_infos["category_id"]
                 roi_infos["roi_cls"].append(roi_cls)
-                roi_infos["score"].append(inst_infos["score"])
-
+                if not test_bbox_type == "gt":
+                    roi_infos["score"].append(inst_infos["score"])  #去掉分数又如何，这里需要修改=====
+                else:
+                    #真实时直接将分数设为1，目前还不清楚这里的分数有什么用
+                    roi_infos["score"].append(1)
                 # extent
                 roi_extent = self._get_extents(dataset_name)[roi_cls]
                 roi_infos["roi_extent"].append(roi_extent)
@@ -419,7 +422,7 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
                 bbox_center = np.array([0.5 * (x1 + x2), 0.5 * (y1 + y2)])
                 bw = max(x2 - x1, 1)
                 bh = max(y2 - y1, 1)
-                scale = max(bh, bw) * cfg.INPUT.DZI_PAD_SCALE
+                scale = max(bh, bw) * cfg.INPUT.DZI_PAD_SCALE  #这里还需要一个动态的获取吗，这也需要考虑
                 scale = min(scale, max(im_H, im_W)) * 1.0#好像在截图的时候并没有考虑到边界框超出图像范围的情况
                 #change after
                 if pnp_net_cfg.R_ONLY:
@@ -431,7 +434,7 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
                     roi_infos["bbox_center"].append(bbox_center.astype("float32"))
                     roi_infos["scale"].append(scale)
                     roi_infos["roi_wh"].append(np.array([bw, bh], dtype=np.float32))
-                    roi_infos["resize_ratio"].append(out_res / scale)
+                    roi_infos["resize_ratio"].append(out_res / scale)  #当旋转和平移bu'fen
 
                 # CHW, float32 tensor
                 # roi_image
@@ -439,6 +442,11 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
                     image, bbox_center, scale, input_res, interpolation=cv2.INTER_LINEAR
                 ).transpose(2, 0, 1)
 
+                #鸡蛋盒的平移效果在linemod-O上的效果特别差，这里查看一下原始的测试图片
+                #仅仅需要查看鸡蛋盒的检测效果--
+                #
+                if inst_i==5:
+                    cv2.imwrite("roi_img.png",roi_img.transpose(1,2,0))
                 roi_img = self.normalize_image(cfg, roi_img)  #图片也要归一化
                 roi_infos["roi_img"].append(roi_img.astype("float32"))
 
@@ -886,7 +894,9 @@ def build_gdrn_test_loader(cfg, dataset_name, train_objs=None):
     )
 
     # load test detection results
-    if cfg.MODEL.LOAD_DETS_TEST:
+    #修改，使其可以使用真实的bbox（在一定配置下）
+    test_bbox_type = cfg.TEST.TEST_BBOX_TYPE
+    if cfg.MODEL.LOAD_DETS_TEST and test_bbox_type=="est":#这里真实的bbox也就变成了相应的估计的bbox
         det_files = cfg.DATASETS.DET_FILES_TEST
         assert len(cfg.DATASETS.TEST) == len(det_files)
         load_detections_into_dataset(

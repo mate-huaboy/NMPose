@@ -1,12 +1,14 @@
 from __future__ import division, print_function
 import os
 import cv2
+from cv2 import mean
 
 import torch
 import torch.nn.functional as F
+import torch.nn as nn
 import os.path as osp
 import sys
-
+from lib.pysixd.pose_error import re_rad_train
 from zmq import device
 from detectron2.data import MetadataCatalog
 import ref
@@ -14,6 +16,7 @@ from lib.meshrenderer.meshrenderer_phong_normals import Renderer
 import numpy as np
 from core.utils.pose_utils import quat2mat_torch
 from losses.diff_render.diffrenderNormal import DiffRenderer_Normal_Wrapper
+from losses.pm_loss import PyPMLoss
 # from verify_idea.render.diffrenderNormal import DiffRenderer_Normal_Wrapper
 cur_dir = osp.abspath(osp.dirname(__file__))
 PROJ_ROOT = osp.join(cur_dir, "../..")
@@ -73,13 +76,13 @@ class PyrotLoss:
 
 
     def get_rot_normal_loss(
-        self, pred_rots, gt_rots,cla,dataset_name,roi_cams=None#可能最后需要加上一个mask，使用原来已有的真实值的法线图而不用再渲染
+        self, pred_rots, gt_rots,cla,dataset_name,roi_cams=None #可能最后需要加上一个mask，使用原来已有的真实值的法线图而不用再渲染
     ):
     # pred_rots: [B, 3, 3]
     # gt_rots: [B, 3, 3] or [B, 4]
     #cla is class [B]
         if gt_rots.shape[-1] == 4:
-                gt_rots = quat2mat_torch(gt_rots)
+                gt_rots = quat2mat_torch(gt_rots)#四元数转旋转矩阵，并不是所有四元数都要转，可以分别考虑对称和非对称，后面再说
         if dataset_name is None:
             dataset_name=list(self.renderer.keys())[0]#如果为空则选择第一个，目前都为空
         # if self.symmetric: #对称物体需要特殊处理
@@ -105,19 +108,35 @@ class PyrotLoss:
 #         # T = torch.tensor([42.36749640, 1.84263252, 768.28001229], dtype=torch.float32,device="cuda:0") / 1000
 #         K=torch.tensor(K, dtype=torch.float32,).reshape(1,3,3)
 #         K=K.repeat(2,1,1)
+        
+       
+            
+      
+
+        #求对称的损失===================================
         img_normal=self.renderer[dataset_name](cla,pred_rots,gt_rots,roi_cams,(IM_H,IM_W))#找到原因了，是这个IM_H和IM_W的原因
+
         # img_normal=self.renderer[dataset_name]((1,2),R,R,K,(480,640))
-        img_normal_pre=img_normal[:24]
-        img_normal_gt=img_normal[24:]
+        count=int(img_normal.shape[0]/2)
+        img_normal_pre=img_normal[:count]
+        img_normal_gt=img_normal[count:]
+        # mean(error_not_sym_list)
+        loss_dict={}
         # mask=((img_normal_gt[...,:1]!=0)|(img_normal_gt[...,1:2]!=0)|(img_normal_gt[...,2:]!=0))
         # mask=torch.squeeze(mask)
-        # pre_i=img_normal_pre[1].detach().cpu().numpy()*255
-        # gt_i=img_normal_gt[1].detach().cpu().numpy()*255
-        # zb0=pre_i[...,2]>0
-        # gt_zb0=gt_i[...,2]>0
-        # cv2.imwrite("a.png",pre_i*zb0[...,None])
-        # cv2.imwrite("b.png",gt_i*gt_zb0[...,None])#渲染错误
-
+        # for i in range(img_normal_pre.shape[0]):
+        #     print(pred_rots[i])
+        #     print(gt_rots[i])
+        #     print(pred_rots[i].t()@pred_rots[i])
+        #     print(gt_rots[i].t()@gt_rots[i])
+        #     pre_i=img_normal_pre[i].detach().cpu().numpy()*255
+        #     gt_i=img_normal_gt[i].detach().cpu().numpy()*255
+        #     zb0=pre_i[...,2]>0
+        #     gt_zb0=gt_i[...,2]>0
+        #     cv2.imwrite("ab0.png",pre_i*zb0[...,None])
+        #     cv2.imwrite("bb0.png",gt_i*gt_zb0[...,None])#渲染错误
+        #     cv2.imwrite("a0.png",pre_i)
+        #     cv2.imwrite("b0.png",gt_i)#渲染错误
                
 
         # endtime = datetime.datetime.now()
@@ -144,6 +163,9 @@ class PyrotLoss:
         cos_simi=cos_simi.sum()/mask.sum()
         cos_simi=cos_simi.arccos()
         loss_dict ={"loss_rot_normal":cos_simi}
+        #加上L1损失，为其克服局部对称的物体
+        
+        # loss_dict["loss_rot_L1"]=nn.L2Loss(reduction="mean").forward(img_normal_pre,img_normal_gt)
         # endtime3=datetime.datetime.now()
         # print((endtime3-endtime2).microseconds)
 

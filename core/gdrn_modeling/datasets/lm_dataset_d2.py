@@ -156,7 +156,7 @@ class LM_Dataset(object):
                     proj = proj[:2] / proj[2]
 
                     bbox_visib = gt_info_dict[str_im_id][anno_i]["bbox_visib"]
-                    bbox_obj = gt_info_dict[str_im_id][anno_i]["bbox_obj"]
+                    bbox_obj = gt_info_dict[str_im_id][anno_i]["bbox_obj"]#最后也加上score
                     x1, y1, w, h = bbox_visib
                     if self.filter_invalid:
                         if h <= 1 or w <= 1:
@@ -178,7 +178,7 @@ class LM_Dataset(object):
                     inst = {
                         "category_id": cur_label,  # 0-based label
                         "bbox": bbox_visib,  # TODO: load both bbox_obj and bbox_visib
-                        "bbox_mode": BoxMode.XYWH_ABS,
+                        "bbox_mode": BoxMode.XYWH_ABS,  #注意这里的模式要和后面的模式对应起来
                         "pose": pose,
                         "quat": quat,
                         "trans": t,
@@ -186,7 +186,9 @@ class LM_Dataset(object):
                         "segmentation": mask_rle,
                         "mask_full_file": mask_file,  # TODO: load as mask_full, rle
                     }
-                    if ("test" not in self.name) or True:  # only when train can get xyz因为需要测试直接去掉旋转头的情况，所以add True to get xyz
+                    # if ("test" not in self.name) or True:  # only when train can get xyz因为需要测试直接去掉旋转头的情况，所以add True to get xyz,修改
+                    if ("test" not in self.name):  # only when train can get xyz因为需要测试直接去掉旋转头的情况，所以add True to get xyz,修改
+
                         xyz_path = osp.join(xyz_root, f"{int_im_id:06d}_{anno_i:06d}.pkl")
                         nxyz_path=osp.join(nxyz_root, f"{int_im_id:06d}_{anno_i:06d}-nxyz.pkl")
                         assert osp.exists(xyz_path), xyz_path
@@ -415,7 +417,9 @@ SPLITS_LM = dict(
         ann_files=[osp.join(DATASETS_ROOT, "BOP_DATASETS/lmo/image_set/lmo_test.txt")],
         # NOTE: scene root
         image_prefixes=[osp.join(DATASETS_ROOT, "BOP_DATASETS/lmo/test/{:06d}").format(2)],
-        xyz_prefixes=[None],
+        # xyz_prefixes=[None],#修改，增加
+        xyz_prefixes=[None],#修改，增加，随便写个什么？
+
         nxyz_prefixes=[None],
         scale_to_meter=0.001,
         with_masks=True,  # (load masks but may not use it)

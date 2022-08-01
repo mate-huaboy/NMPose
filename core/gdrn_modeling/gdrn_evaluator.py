@@ -669,7 +669,7 @@ def save_result_of_dataset(cfg, model, data_loader, output_dir, dataset_name):
 
     total = len(data_loader)  # inference data loader must have a fixed length
     results = OrderedDict()
-    VIS = False
+    VIS = False     #这是个啥，修改，原来是false
 
     logging_interval = 50
     num_warmup = min(5, logging_interval - 1, total - 1)
@@ -732,8 +732,9 @@ def save_result_of_dataset(cfg, model, data_loader, output_dir, dataset_name):
                     img_vis = vis_image_mask_bbox_cv2(
                         image, pred_masks, boxes, labels=[obj_names[int(label)] for label in labels]
                     )
-                    cv2.imshow("img", img_vis.astype("uint8"))
-                    cv2.waitKey()
+                    cv2.imwrite("img.png",img_vis.astype("unit8"))
+                    # cv2.imshow("img", img_vis.astype("uint8"))  #修改，因为不可直接查看
+                    # cv2.waitKey()
                 results[_input["scene_im_id"]] = cur_results
 
             if (idx + 1) % logging_interval == 0:

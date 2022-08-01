@@ -186,24 +186,37 @@ for result_filename in p["result_filenames"]:
         for obj_id in dp_model["obj_ids"]:
             models_sym[obj_id] = misc.get_symmetry_transformations(models_info[obj_id], p["max_sym_disc_step"])
 
-    # Initialize a renderer.
+    # Initialize a renderer.============================================================================
     ren = None
     if p["error_type"] in ["vsd", "cus"]:
         misc.log("Initializing renderer...")
         width, height = dp_split["im_size"]
-        if p["renderer_type"] in ["python", "cpp"]:
+        if p["renderer_type"] in ["python", "cpp"] or True:  #只走这部分
             ren = renderer.create_renderer(width, height, p["renderer_type"], mode="depth")
             for obj_id in dp_model["obj_ids"]:
                 ren.add_object(obj_id, dp_model["model_tpath"].format(obj_id=obj_id))
         elif p["renderer_type"] == "egl":
-            from lib.egl_renderer.egl_renderer import EGLRenderer
+            # from lib.egl_renderer.egl_renderer import EGLRenderer  #修改，改成
+            from lib.meshrenderer.meshrenderer_phong import Renderer #修改
+
 
             model_paths = [dp_model["model_tpath"].format(obj_id=obj_id) for obj_id in dp_model["obj_ids"]]
             texture_paths = [
                 model_path.replace(".ply", ".png") if osp.exists(model_path.replace(".ply", ".png")) else ""
                 for model_path in model_paths
             ]
-            ren = EGLRenderer(
+            # ren = EGLRenderer(
+            #     model_paths=model_paths,
+            #     texture_paths=texture_paths,
+            #     vertex_scale=1,
+            #     model_loadfn="pyassimp",
+            #     use_cache=True,
+            #     width=width,
+            #     height=height,
+            #     znear=0.01,
+            #     zfar=10000,
+            # )
+            ren = Renderer(#修改
                 model_paths=model_paths,
                 texture_paths=texture_paths,
                 vertex_scale=1,
@@ -215,7 +228,9 @@ for result_filename in p["result_filenames"]:
                 zfar=10000,
             )
         elif p["renderer_type"] == "aae":
-            from lib.meshrenderer.meshrenderer_phong_color import Renderer
+            # from lib.meshrenderer.meshrenderer_phong_color import Renderer
+            from lib.meshrenderer.meshrenderer_phong import Renderer #修改
+
 
             model_paths = [dp_model["model_tpath"].format(obj_id=obj_id) for obj_id in dp_model["obj_ids"]]
             ren = Renderer(
@@ -229,6 +244,7 @@ for result_filename in p["result_filenames"]:
                 recalculate_normals=True,
                 use_cache=False,
             )
+    #========================================================
 
     # Load the estimation targets.
     targets = inout.load_json(osp.join(dp_split["base_path"], p["targets_filename"]))

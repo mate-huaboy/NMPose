@@ -202,6 +202,27 @@ def re_sym(R_est, R_gt, syms):
 
     return min(es)
 
+def re_sym_array(R_est, R_gt, syms_array):
+    """Rotational Error.
+
+    :param R_est: 3x3 ndarray with the estimated rotation matrix.
+    :param R_gt: 3x3 ndarray with the ground-truth rotation matrix.
+    :return: The calculated error.
+    """
+    assert R_est.shape == R_gt.shape == (3, 3)
+    es = []
+    for sym in syms_array:
+        R_gt_sym = R_gt.dot(sym)
+        rotation_diff = np.dot(R_est, R_gt_sym.T)
+        trace = np.trace(rotation_diff)
+        trace = trace if trace <= 3 else 3
+        # Avoid invalid values due to numerical errors
+        error_cos = min(1.0, max(-1.0, 0.5 * (trace - 1.0)))
+        rd_deg = np.rad2deg(np.arccos(error_cos))
+        es.append(rd_deg)
+
+    return min(es)
+
 
 def te_sym(t_est, t_gt, R_gt, syms):
     """Translational Error.
@@ -215,7 +236,7 @@ def te_sym(t_est, t_gt, R_gt, syms):
     assert t_est.size == t_gt.size == 3
     es = []
     for sym in syms:
-        t_gt_sym = R_gt.dot(sym["t"]) + t_gt
+        t_gt_sym = R_gt.dot(sym["t"]) + t_gt   #不明白为什么选择会影响平移呢，对称的旋转对应着不同的平移
         error = np.linalg.norm(t_gt_sym - t_est)
         es.append(error)
     return min(es)
@@ -411,10 +432,30 @@ def re(R_est, R_gt):
     trace = np.trace(rotation_diff)
     trace = trace if trace <= 3 else 3#不知道为什么可以这样评估旋转误差
     # Avoid invalid values due to numerical errors
-    error_cos = min(1.0, max(-1.0, 0.5 * (trace - 1.0)))
-    rd_deg = np.rad2deg(np.arccos(error_cos))
+    error_cos = min(1.0, max(-1.0, 0.5 * (trace - 1.0)))#如果大于3直接返回0了，看不懂这操作
+    rd_deg = np.rad2deg(np.arccos(error_cos))  #去掉这个弧度转度即可
 
     return rd_deg
+
+def re_rad_train(R_est, R_gt):
+    """Rotational Error.
+
+    :param R_est: 3x3 tensor with the estimated rotation matrix.
+    :param R_gt: 3x3 ndarray with the ground-truth rotation matrix.
+    :return: The calculated error.
+    """
+    assert R_est.shape == R_gt.shape == (3, 3)
+    rotation_diff = R_est@R_gt.t()
+    # trace = np.trace(rotation_diff)
+    trace = rotation_diff.trace()
+   
+    trace = trace if trace <= 3 else 3#不知道为什么可以这样评估旋转误差--好像不行，哎
+    # Avoid invalid values due to numerical errors
+    error_cos = min(1.0, max(-1.0, 0.5 * (trace - 1.0)))
+    rd_deg=error_cos.arccos()
+    # rd_deg = np.rad2deg(np.arccos(error_cos))  #去掉这个弧度转度即可
+    return rd_deg
+
 
 
 def re_q(q1, q2):

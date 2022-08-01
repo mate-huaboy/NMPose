@@ -50,11 +50,11 @@ mesh.scale_verts_(0.001)
 #    [[1.0,0,0],[0,1.0,0],[0,0,1.0]],
 #     dtype=torch.float32,
 # )
-# T = torch.tensor([0,0,1], dtype=torch.float32) 
+T = torch.tensor([0,0,1], dtype=torch.float32) 
 R_gt=np.array( [-0.175483, 0.98447901, 0.00246469, 0.89255601, 0.160153, -0.42153901, -0.415391, -0.0717731, -0.90680701]).reshape(3,3)
-t_gt=np.array(  [107.21688293, -45.40241317, 1014.50072417]).reshape(1,3)/1000
+# t_gt=np.array(  [107.21688293, -45.40241317, 1014.50072417]).reshape(1,3)/1000
 R=torch.tensor(R_gt)
-T=torch.tensor(t_gt)
+# T=torch.tensor(t_gt)
 
 sys_T=np.array([-0.999964, -0.00333777, -0.0077452, 0.232611, 0.00321462, -0.999869, 0.0158593, 0.694388, -0.00779712, 0.0158338, 0.999844, -0.0792063, 0, 0, 0, 1] ).reshape(4,4)
 sys_T=torch.tensor(sys_T,dtype=torch.float32)
@@ -114,7 +114,7 @@ camera = PerspectiveCameras(
 camera1 = PerspectiveCameras(
     R=R1, T=T, focal_length=f, principal_point=p, image_size=((h, w),), device=device,in_ndc=False
 )
-T2 = torch.tensor([0.25, 0, 1], dtype=torch.float32,device="cuda:0") 
+T2 = torch.tensor([-0.1, 0, 1], dtype=torch.float32,device="cuda:0") 
 T2=T2.view(1,3)
 camera2=PerspectiveCameras(R=R,T=T2,focal_length=f, principal_point=p, image_size=((h, w),), device=device,in_ndc=False)
 
