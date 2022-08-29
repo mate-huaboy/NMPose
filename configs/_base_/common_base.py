@@ -84,7 +84,7 @@ DATASETS = dict(
 # -----------------------------------------------------------------------------
 DATALOADER = dict(
     # Number of data loading threads
-    NUM_WORKERS=4,
+    NUM_WORKERS=6,  #增加一点
     ASPECT_RATIO_GROUPING=False,  # default True in detectron2
     # Default sampler for dataloader
     # Options: TrainingSampler, RepeatFactorTrainingSampler

@@ -20,6 +20,8 @@ from losses.pm_loss import PyPMLoss
 # from verify_idea.render.diffrenderNormal import DiffRenderer_Normal_Wrapper
 cur_dir = osp.abspath(osp.dirname(__file__))
 PROJ_ROOT = osp.join(cur_dir, "../..")
+from ..losses.l2_loss import L2Loss
+
 sys.path.insert(0, PROJ_ROOT)
 import datetime
 idx2class = {
@@ -122,7 +124,7 @@ class PyrotLoss:
         img_normal_gt=img_normal[count:]
         # mean(error_not_sym_list)
         loss_dict={}
-        # mask=((img_normal_gt[...,:1]!=0)|(img_normal_gt[...,1:2]!=0)|(img_normal_gt[...,2:]!=0))
+      
         # mask=torch.squeeze(mask)
         # for i in range(img_normal_pre.shape[0]):
         #     print(pred_rots[i])
@@ -150,22 +152,33 @@ class PyrotLoss:
         # img_normal_gt=torch.cat(img_normal_gt,dim=0)
         # img_normal_pre=img_normal_pre[:,...,:3]
         # img_normal_gt=torch.squeeze(img_normal_gt)
-
+       #应用余弦相似度======================
         # cos_simi=1-F.cosine_similarity(img_normal_pre,img_normal_gt,dim=3)
-        cos_simi=F.cosine_similarity(img_normal_pre,img_normal_gt,dim=3)
-        mask=(cos_simi!=0)
-        mask=torch.squeeze(mask)
+        # # cos_simi=F.cosine_similarity(img_normal_pre,img_normal_gt,dim=3)
+        # mask=(cos_simi!=0)
+        # mask=torch.squeeze(mask)
         # cos_simi=1-cos_simi
 
         # loss_dict["loss_coor"]=cos_simi.sum()/gt_mask_xyz.sum().float().clamp(min=1.0)
         #=====================
         # cos_simi=mask*cos_simi
-        cos_simi=cos_simi.sum()/mask.sum()
-        cos_simi=cos_simi.arccos()
-        loss_dict ={"loss_rot_normal":cos_simi}
-        #加上L1损失，为其克服局部对称的物体
+        # cos_simi=cos_simi.sum()/mask.sum()
+        # cos_simi=cos_simi.arccos()
+        # if cos_simi<0.25:
+        # loss_dict ={"loss_rot_normal":cos_simi}#
+
+        #加上mask的L1损失=====================
+        # gt_mask=(img_normal_gt[...,:1]!=0)|(img_normal_gt[...,1:2]!=0)|(img_normal_gt[...,2:]!=0)
+        # pre_mask=(img_normal_pre[...,:1]!=0)|(img_normal_pre[...,1:2]!=0)|(img_normal_pre[...,2:]!=0)
+       
         
-        # loss_dict["loss_rot_L1"]=nn.L2Loss(reduction="mean").forward(img_normal_pre,img_normal_gt)
+       
+        # loss_dict["loss_rot_mask_L1"]= nn.L1Loss(reduction="mean")(gt_mask,pre_mask)
+
+        #加上L2损失，为其克服局部对称的物体===========================
+        
+        # loss_dict["loss_rot_L2"]=L2Loss(reduction="mean").forward(img_normal_pre,img_normal_gt)
+        loss_dict["loss_rot_L2_MSE"]=nn.MSELoss(reduction="mean")(img_normal_pre,img_normal_gt)
         # endtime3=datetime.datetime.now()
         # print((endtime3-endtime2).microseconds)
 

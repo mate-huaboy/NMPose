@@ -168,7 +168,7 @@ class DiffRenderer_Normal_Wrapper(nn.Module):
                                                     near, far,render_texture=render_tex)
         mesh = Meshes(
             verts=V_l,faces=F_l,verts_normals=v_n_l2
-        )
+        )#这里先去掉真实的旋转对应的法线图
         normal_gt=self.renderers[0](gt_T, K, mesh,render_image_size,
                                                     near, far,render_texture=render_tex)#这个gt_T也需要相应的mash
         normal=torch.cat([normal_pre,normal_gt],dim=0)

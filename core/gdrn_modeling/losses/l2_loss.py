@@ -6,6 +6,7 @@ def l2_loss(pred, target, reduction="mean"):
     assert pred.size() == target.size() and target.numel() > 0
     assert pred.size()[0] == target.size()[0]
     batch_size = pred.size()[0]
+    a=(pred - target).view(batch_size, -1)
     loss = torch.norm((pred - target).view(batch_size, -1), p=2, dim=1, keepdim=True)
     # loss = torch.sqrt(torch.sum(((pred - target)** 2).view(batch_size, -1), 1))
     # print(loss.shape)
