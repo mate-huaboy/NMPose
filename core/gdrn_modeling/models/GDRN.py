@@ -25,7 +25,8 @@ from core.utils.pose_utils import get_closest_rot_batch
 
 
 # pnp net variants
-from .conv_pnp_net import ConvPnPNet
+# from .conv_pnp_net import ConvPnPNet #change
+from .pnp_net_v2 import ConvPnPNet
 from .model_utils import compute_mean_re_te, compute_mean_re_te_sym, get_mask_prob
 from .point_pnp_net import PointPnPNet, SimplePointPnPNet
 from .pose_from_pred import pose_from_pred
@@ -64,7 +65,7 @@ class GDRN(nn.Module):
         # for dataset_name in cfg.DATASETS.TRAIN:
         #     self.rot_normalLoss.add_dataset_name(dataset_name)
         #可以去掉该信息
-        if self.cfg.MODEL.CDPN.PNP_NET.ENABLE:
+        if self.cfg.MODEL.CDPN.PNP_NET.ENABLE and False:
             self.rot_normalLoss.add_dataset_name( cfg.DATASETS.TRAIN[0])
 
         #
@@ -137,6 +138,9 @@ class GDRN(nn.Module):
         pnp_net_cfg = cfg.MODEL.CDPN.PNP_NET
         region=None
         
+        #add channels
+        if cfg.MODEL.CDPN.BACKBONE.INPUT_CHANNEL==5:
+            x=torch.cat([x,roi_coord_2d],dim=1)
         # x.shape [bs, 3, 256, 256]
         if self.concat:
             features, x_f64, x_f32, x_f16 = self.backbone(x)  # features.shape [bs, 2048, 8, 8]
@@ -181,7 +185,7 @@ class GDRN(nn.Module):
             mask=mask[:,None]
             region=None
 
-            
+        #normalize            
         coor_feat = torch.cat([coor_x, coor_y, coor_z], dim=1)
         coor_feat=F.normalize(coor_feat,p=2,dim=1)
         if pnp_net_cfg.ENABLE and not pnp_net_cfg.FREEZE:#需要乘这个mask吗，需要考察，因为遮挡
@@ -267,60 +271,13 @@ class GDRN(nn.Module):
                 # grid=F.affine_grid(Ms,(24,3,64,64))
 
                 coor_feat=F.grid_sample(coor_feat,grid)
-                # gt_xyz=F.grid_sample(gt_xyz,grid)  #真实的法线也做相应的移动
-                # grid1=F.affine_grid(Ms,(24,1,64,64))
-                # gt_mask_visib=gt_mask_visib[:,None]
-                # gt_mask_visib=F.grid_sample(gt_mask_visib,grid1)
-                # gt_mask_visib.squeeze_()
-                #好像真实的nxyz也应该移到中心
-
-                # coor_feat1=F.normalize(coor_feat1,p=2,dim=1)
-                # cv2.imwrite("real_img.png",x[0].cpu().numpy().transpose(1,2,0)*255)
-                # cv2.imwrite("trans_after.png",coor_feat[0].detach().cpu().numpy().transpose(1,2,0)*255)
-                
-                # cv2.imwrite("gt_nxyz.png",gt_xyz[0].detach().cpu().numpy().transpose(1,2,0)*255)
-                # roi_nxyz=coor_feat1[0].cpu().numpy().transpose(1,2,0) 
-                # print(np.linalg.norm(np.array([roi_nxyz[34][30][0],roi_nxyz[34][30][1],roi_nxyz[34][30][2]])))
-                # aa=np.linalg.norm(roi_nxyz,axis=2)
-                # print(aa)
-                # cv2.imwrite("guiyihua.png",aa*255)
-                # roi_nxyz2=coor_feat[0].cpu().numpy().transpose(1,2,0)  # 归一化
-                # bbox_center = np.array([32, 32])+cent_temp[0]/whs[0][0]*64#cal by myself
-                # roi_nxyz1=crop_resize_by_warp_affine(roi_nxyz2, bbox_center, 64, 64, interpolation=cv2.INTER_LINEAR) #see this function
-                # print(np.linalg.norm(np.array([roi_nxyz1[34][30][0],roi_nxyz1[34][30][1],roi_nxyz1[34][30][2]])))
-                # aa=np.linalg.norm(roi_nxyz1,axis=2)
-                # print(aa)
-                # cv2.imwrite("guiyihua2.png",aa*255)
-                # cv2.imwrite("roi_nxyz.png",roi_nxyz*255)
-                # cv2.imwrite("roi_nxyz1.png",roi_nxyz1*255)
-                # cv2.imwrite("roi_nxyzdif.png",(roi_nxyz-roi_nxyz1)*255)
-                # cv2.imwrite("roi_nxyzdif1.png",(roi_nxyz1-roi_nxyz)*255)
-
-
-
-
-
-
                 #
-                
-
         coor_x=coor_feat[:,0,]
         coor_x=coor_x[:,None]
         coor_y=coor_feat[:,1,:,:]
         coor_y=coor_y[:,None]
         coor_z=coor_feat[:,2,:,:]
         coor_z=coor_z[:,None]
-
-                    
-                # coor_feat=F.normalize(coor_feat,p=2,dim=1)
-                # coor_x=coor_feat[:,0,]
-                # coor_x=coor_x[:,None]
-                # coor_y=coor_feat[:,1,:,:]
-                # coor_y=coor_y[:,None]
-                # coor_z=coor_feat[:,2,:,:]
-                # coor_z=coor_z[:,None]
-
-        #再单位化#应该不用在单位化了吧
 
 
         # TODO: remove this trans_head_net
@@ -384,14 +341,19 @@ class GDRN(nn.Module):
         # )
         #修改为中心的移动
         if  pnp_net_cfg.ENABLE:
-            pred_rot_, pred_t_ = self.pnp_net(
-                coor_feat, region=region_atten, extents=roi_extents, mask_attention=mask_atten
+            if pnp_net_cfg.TRUE_NORMAL and False:
+                 pred_rot_, pred_t_ = self.pnp_net(
+                gt_xyz, region=region_atten, extents=roi_extents, mask_attention=mask_atten
             )
+            else:
+                cv2.imwrite("origin.png",gt_xyz[0].cpu().numpy().transpose(1,2,0)*255)
+                cv2.imwrite("img.png",coor_feat[0].cpu().numpy().transpose(1,2,0)*255)
+                cv2.imwrite("dif.png",gt_xyz[0].cpu().numpy().transpose(1,2,0)*255-coor_feat[0].cpu().numpy().transpose(1,2,0)*255)
+                pred_rot_, pred_t_ = self.pnp_net(
+                    coor_feat, region=region_atten, extents=roi_extents, mask_attention=mask_atten
+                )
         
         
-
-        
-
             # convert pred_rot to rot mat -------------------------
             rot_type = pnp_net_cfg.ROT_TYPE
             if rot_type in ["ego_quat", "allo_quat"]:
@@ -595,7 +557,6 @@ class GDRN(nn.Module):
                 ) / gt_mask_xyz.sum().float().clamp(min=1.0)
             elif xyz_loss_type=="Cos_smi":
                 #求余弦相似度的相反数的和作为损失函数
-
                 coor_feat = torch.cat([out_x, out_y, out_z], dim=1)
                 #归一化
                 # coor_feat=F.normalize(coor_feat,p=2,dim=1)
@@ -692,7 +653,7 @@ class GDRN(nn.Module):
         if pnp_net_cfg.ENABLE and not pnp_net_cfg.FREEZE:
             if pnp_net_cfg.PM_LW > 0:
                 
-                if pnp_net_cfg.PM_LOSS_TYPE=="normal_loss":
+                if pnp_net_cfg.PM_LOSS_TYPE=="normal_loss" and False:
                     
                     sym_list=[]
                     error_not_sym_list=[]
@@ -720,7 +681,7 @@ class GDRN(nn.Module):
                                         disentangle_t=pnp_net_cfg.PM_DISENTANGLE_T,
                                         disentangle_z=pnp_net_cfg.PM_DISENTANGLE_Z,
                                         t_loss_use_points=pnp_net_cfg.PM_T_USE_POINTS,
-                                        r_only=pnp_net_cfg.PM_R_ONLY,
+                                        r_only=pnp_net_cfg.PM_R_ONLY,   #check this R_noly
                                     )
                         loss_pm_dict = loss_func(
                             pred_rots=out_rot[error_not_sym_list],
@@ -732,6 +693,11 @@ class GDRN(nn.Module):
                             sym_infos=sym_infos,
                         )
                         loss_dict.update(loss_pm_dict)#向字典中加入字典
+                elif pnp_net_cfg.PM_LOSS_TYPE=="normal_loss":
+                        loss_normal_dict= self.rot_normalLoss.get_rot_normal_loss(out_rot,gt_rot,roi_classes,None,roi_cams)
+                        loss_dict.update(loss_normal_dict)#向字典中加入字典
+                        
+
                 #============================================================================
 
                 else:
@@ -1007,7 +973,7 @@ def build_model_optimizer(cfg):
                     rot_dim=rot_dim,
                     num_regions=r_head_cfg.NUM_REGIONS,
                     featdim=128,
-                    num_layers=3,
+                    num_layers=pnp_net_cfg.NUM_LAYERS,
                     mask_attention_type=pnp_net_cfg.MASK_ATTENTION,
                 )
                 pnp_net = ConvPnPNet(**pnp_head_cfg)

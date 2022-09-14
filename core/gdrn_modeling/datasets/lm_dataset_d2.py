@@ -186,8 +186,8 @@ class LM_Dataset(object):
                         "segmentation": mask_rle,
                         "mask_full_file": mask_file,  # TODO: load as mask_full, rle
                     }
-                    # if ("test" not in self.name) or True:  # only when train can get xyz因为需要测试直接去掉旋转头的情况，所以add True to get xyz,修改
-                    if ("test" not in self.name):  # only when train can get xyz因为需要测试直接去掉旋转头的情况，所以add True to get xyz,修改
+                    if ("test" not in self.name) or True:  # only when train can get xyz因为需要测试直接去掉旋转头的情况，所以add True to get xyz,修改
+                    # if ("test" not in self.name): # only when train can get xyz因为需要测试直接去掉旋转头的情况，所以add True to get xyz,修改
 
                         xyz_path = osp.join(xyz_root, f"{int_im_id:06d}_{anno_i:06d}.pkl")
                         nxyz_path=osp.join(nxyz_root, f"{int_im_id:06d}_{anno_i:06d}-nxyz.pkl")

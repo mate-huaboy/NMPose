@@ -89,8 +89,9 @@ def batch_data_test(cfg, data, device="cuda"):
         # flatten the lists
         if key in data[0]:
             batch[key] = list(itertools.chain(*[d[key] for d in data]))
-    if not cfg.MODEL.CDPN.ROT_HEAD.ENABLED:
+    if  cfg.MODEL.CDPN.PNP_NET.TRUE_NORMAL:
         batch["roi_nxyz"]=torch.cat([d["roi_nxyz"] for d in data], dim=0).to(device, non_blocking=True)
+        batch["roi_mask_visib"]=torch.cat([d["roi_mask_visib"] for d in data], dim=0).to(device, non_blocking=True)
     return batch
 
 

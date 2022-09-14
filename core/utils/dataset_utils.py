@@ -174,10 +174,10 @@ def load_detections_into_dataset(
                 :top_k_per_obj
             ]
             #自己加---为测试集加上nxyz的路径====可能有错
-            # if len(annotations)<len(record["annotations"]) and sel_annos!=[]:
-            #     temp=record["annotations"][len(annotations)]
-            #     nxyz=temp["nxyz_path"]
-            #     sel_annos[0]["nxyz_path"]=nxyz
+            if len(annotations)<len(record["annotations"]) and sel_annos!=[]:
+                temp=record["annotations"][len(annotations)]
+                nxyz=temp["nxyz_path"]
+                sel_annos[0]["nxyz_path"]=nxyz
           
             #===================
             annotations.extend(sel_annos)

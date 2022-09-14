@@ -566,14 +566,18 @@ def gdrn_inference_on_dataset(cfg, model, data_loader, evaluator, amp_test=False
                     continue
 
             #如果没有旋转头则需要加上gt_nxyz值
-            gt_nxyz=None
-            if not cfg.MODEL.CDPN.ROT_HEAD.ENABLED:
-                 gt_nxyz=batch.get("roi_nxyz", None)
+            # gt_nxyz=None
+            # gt_mask_visib=None,
+
+            # if not cfg.MODEL.CDPN.ROT_HEAD.ENABLED:
+            #      gt_nxyz=batch.get("roi_nxyz", None)
+            #      gt_mask_visib=batch.get("gt_mask_visib",None)
 
             with autocast(enabled=amp_test):
                 out_dict = model(
                     batch["roi_img"],
                     gt_xyz=batch.get("roi_nxyz", None),#如果没有旋转头则需要加上gt_nxyz值
+                    gt_mask_visib=batch.get("roi_mask_visib",None),
                     roi_classes=batch["roi_cls"],
                     roi_cams=batch["roi_cam"],
                     roi_whs=batch["roi_wh"],

@@ -362,7 +362,7 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
         out_res = cfg.MODEL.CDPN.BACKBONE.OUTPUT_RES #64
 
         # CHW -> HWC
-        coord_2d = get_2d_coord_np(im_W, im_H, low=0, high=1).transpose(1, 2, 0)
+        coord_2d = get_2d_coord_np(im_W, im_H, low=0, high=1).transpose(1, 2, 0)#change
 
         #################################################################################
         if self.split != "train":
@@ -383,9 +383,11 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
                         ]
             for _key in roi_keys:
                 roi_infos[_key] = []
-            if not r_head_cfg.ENABLED:
+            if pnp_net_cfg.TRUE_NORMAL:
                 roi_infos["roi_nxyz"] = []
                 roi_keys.append("roi_nxyz")
+                roi_infos["roi_mask_visib"]=[]
+                roi_keys.append("roi_mask_visib")
 
             # yapf: enable
             # TODO: how to handle image without detections
@@ -424,20 +426,39 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
                 bh = max(y2 - y1, 1)
                 scale = max(bh, bw) * cfg.INPUT.DZI_PAD_SCALE  #这里还需要一个动态的获取吗，这也需要考虑
                 scale = min(scale, max(im_H, im_W)) * 1.0#好像在截图的时候并没有考虑到边界框超出图像范围的情况
+
+                #if center use 物体中心 scale is same========,
+                
+                # nxyz_info = mmcv.load(inst_infos["nxyz_path"])  #'/home/lyn/Desktop/GDR-Net-main/datasets/lm_imgn/xyz_crop_imgn/ape/000005_9-xyz.pkl'
+                # #'/home/lyn/Desktop/GDR-Net-main/datasets/BOP_DATASETS/lm/test/xyz_crop/000006/001073_000000.pkl'
+                # x1, y1, x2, y2 = nxyz_info["nxyxy"]
+                # bbox_center = np.array([0.5 * (x1 + x2), 0.5 * (y1 + y2)])#
+                # bw = max(x2 - x1, 1)
+                # bh = max(y2 - y1, 1)
+                # scale = max(bh, bw) * cfg.INPUT.DZI_PAD_SCALE
+                #===========================
+
                 #change after
-                if pnp_net_cfg.R_ONLY:
+                if pnp_net_cfg.R_ONLY:#
                     roi_infos["bbox_center"].append(bbox_center.astype("float32"))
                     roi_infos["scale"].append(scale)
                     roi_infos["roi_wh"].append(np.array([scale, scale], dtype=np.float32))
                     roi_infos["resize_ratio"].append(input_res / scale)
-                else:#change before
+                else:
                     roi_infos["bbox_center"].append(bbox_center.astype("float32"))
                     roi_infos["scale"].append(scale)
-                    roi_infos["roi_wh"].append(np.array([bw, bh], dtype=np.float32))
-                    roi_infos["resize_ratio"].append(out_res / scale)  #当旋转和平移bu'fen
+                    roi_infos["roi_wh"].append(np.array([scale, scale], dtype=np.float32))
+                    roi_infos["resize_ratio"].append(out_res/ scale)
+                    #change before
+                    # roi_infos["bbox_center"].append(bbox_center.astype("float32"))
+                    # roi_infos["scale"].append(scale)
+                    # roi_infos["roi_wh"].append(np.array([bw, bh], dtype=np.float32))
+                    # roi_infos["resize_ratio"].append(out_res / scale)  #当旋转和平移bu'fen
 
                 # CHW, float32 tensor
                 # roi_image
+               
+
                 roi_img = crop_resize_by_warp_affine(
                     image, bbox_center, scale, input_res, interpolation=cv2.INTER_LINEAR
                 ).transpose(2, 0, 1)
@@ -446,19 +467,28 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
                 #仅仅需要查看鸡蛋盒的检测效果--
                 #
                 if inst_i==5:
-                    cv2.imwrite("roi_img.png",roi_img.transpose(1,2,0))
+                    cv2.imwrite("roi_img.png",roi_img.transpose(1,2,0))# it's bounding box is very bad
+                
                 roi_img = self.normalize_image(cfg, roi_img)  #图片也要归一化
                 roi_infos["roi_img"].append(roi_img.astype("float32"))
 
                 # roi_coord_2d
+                #change
+                # coord_2d = get_2d_coord_np(int(scale), int(scale), low=0, high=1).transpose(1, 2, 0)#change
+                # coor_bbbox_center=np.array([int(scale/2),int(scale/2)])
+                # roi_coord_2d = crop_resize_by_warp_affine(
+                #     coord_2d, coor_bbbox_center, int(scale), input_res, interpolation=cv2.INTER_LINEAR
+                # ).transpose(
+                #     2, 0, 1
+                # )  # HWC -> CHW
                 roi_coord_2d = crop_resize_by_warp_affine(
-                    coord_2d, bbox_center, scale, out_res, interpolation=cv2.INTER_LINEAR
+                    coord_2d, bbox_center, scale, input_res, interpolation=cv2.INTER_LINEAR
                 ).transpose(
                     2, 0, 1
                 )  # HWC -> CHW
                 roi_infos["roi_coord_2d"].append(roi_coord_2d.astype("float32"))
 
-                if not r_head_cfg.ENABLED:
+                if pnp_net_cfg.TRUE_NORMAL:
                                 #===================
                     nxyz_info = mmcv.load(inst_infos["nxyz_path"])  #'/home/lyn/Desktop/GDR-Net-main/datasets/lm_imgn/xyz_crop_imgn/ape/000005_9-xyz.pkl'
                     #'/home/lyn/Desktop/GDR-Net-main/datasets/BOP_DATASETS/lm/test/xyz_crop/000006/001073_000000.pkl'
@@ -472,40 +502,22 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
                         mask_xyz_interp = cv2.INTER_LINEAR
                     else:
                         mask_xyz_interp = cv2.INTER_NEAREST
-                    #if center use wutizhongxi scale is same
-                    # bbox_center = np.array([0.5 * (x1 + x2), 0.5 * (y1 + y2)])
-                    # bw = max(x2 - x1, 1)
-                    # bh = max(y2 - y1, 1)
-                    # scale = max(bh, bw) * cfg.INPUT.DZI_PAD_SCALE
+                   
                     roi_nxyz=crop_resize_by_warp_affine(nxyz, bbox_center, scale, out_res, interpolation=mask_xyz_interp)
                     roi_nxyz=roi_nxyz.transpose(2,0,1)  #
-                    #normalize too for nxyz   not right
-
-                    #
                     mask_obj = ((nxyz[:, :, 0] != 0) | (nxyz[:, :, 1] != 0) | (nxyz[:, :, 2] != 0)).astype(np.bool).astype(np.float32)
                     roi_mask_obj = crop_resize_by_warp_affine(
                         mask_obj[:, :, None], bbox_center, scale, out_res, interpolation=mask_xyz_interp
                         ) 
-                    #加上真实的平移信息叭
-                    
-                    # roi_mask_obj1 = ((roi_nxyz[0,:, :] != 0) | (roi_nxyz[1,:, :] != 0) | (roi_nxyz[2,:, :] != 0)).astype(np.bool).astype(np.float32)
-
-                    # roi_nxyz[0][roi_mask_obj1==1] = (roi_nxyz[0][roi_mask_obj1==1] / 255 -0.5)*2
-                    # roi_nxyz[1][roi_mask_obj1==1] = (roi_nxyz[1][roi_mask_obj1==1] / 255 -0.5)*2 
-                    # roi_nxyz[2][roi_mask_obj1==1] = (roi_nxyz[2] [roi_mask_obj1==1]/ 255 -0.5)*2 
-                    # #再单位化
-                    # y=np.linalg.norm(roi_nxyz,axis=0,keepdims=True)
-                    # roi_nxyz[0][roi_mask_obj1==1]=roi_nxyz[0][roi_mask_obj1==1]/y[0][roi_mask_obj1==1]
-                    # roi_nxyz[1][roi_mask_obj1==1]=roi_nxyz[1][roi_mask_obj1==1]/y[0][roi_mask_obj1==1]
-                    # roi_nxyz[2][roi_mask_obj1==1]=roi_nxyz[2][roi_mask_obj1==1]/y[0][roi_mask_obj1==1]
 
                     roi_infos["roi_nxyz"].append(roi_nxyz.astype("float32"))
+                    roi_infos["roi_mask_visib"].append(roi_mask_obj.astype("float32"))
                   
                     # dataset_dict["roi_nxyz"]=torch.as_tensor(roi_nxyz.astype("float32")).contiguous()
                     #===============
 
             for _key in roi_keys:
-                if _key in ["roi_img", "roi_coord_2d","roi_nxyz"]:
+                if _key in ["roi_img", "roi_coord_2d","roi_nxyz","roi_mask_visib"]:
                     dataset_dict[_key] = torch.as_tensor(np.array(roi_infos[_key])).contiguous()
                 elif _key in ["model_info", "scene_im_id", "file_name"]:
                     # can not convert to tensor
@@ -567,9 +579,11 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
         # if cfg.TRAIN.VIS:
         #     xyz = self.smooth_xyz(xyz)# maybe it is error
         #====================================================
+
+        
         
 
-        # override bbox info using xyz_infos
+        # override bbox info using xyz_infos,如果不重写是不是就是用的真正的box
         inst_infos["bbox"] = [x1, y1, x2, y2]
         inst_infos["bbox_mode"] = BoxMode.XYXY_ABS
 
@@ -579,9 +593,17 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
 
         # augment bbox ===================================================
         bbox_xyxy = anno["bbox"]
-        bbox_center, scale = self.aug_bbox(cfg, bbox_xyxy, im_H, im_W)
+        bbox_center, scale = self.aug_bbox(cfg, bbox_xyxy, im_H, im_W)  #get DZI as papper
         bw = max(bbox_xyxy[2] - bbox_xyxy[0], 1)
         bh = max(bbox_xyxy[3] - bbox_xyxy[1], 1)
+
+        #使用本身中心以及测试的比例来训练试一试================
+        bbox_center1 = np.array([0.5 * (x1 + x2), 0.5 * (y1 + y2)])
+        bw1 = max(x2 - x1, 1)
+        bh1 = max(y2 - y1, 1)
+        scale1 = max(bh1, bw1) * cfg.INPUT.DZI_PAD_SCALE
+        scale1 = min(scale1, max(im_H, im_W)) * 1.0#好像在截图的时候并没有考虑到边界框超出图像范围的情况
+        # bbox_center=bbox_center1
 
         # CHW, float32 tensor
         ## roi_image ------------------------------------
@@ -592,9 +614,19 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
         roi_img = self.normalize_image(cfg, roi_img)
 
         # roi_coord_2d ----------------------------------------------------
+        #change
+        # coord_2d = get_2d_coord_np(int(scale), int(scale), low=0, high=1).transpose(1, 2, 0)#change
+        # coor_bbbox_center=np.array([int(scale/2),int(scale/2)])
+        # roi_coord_2d = crop_resize_by_warp_affine(
+        #     coord_2d, coor_bbbox_center, int(scale), input_res, interpolation=cv2.INTER_LINEAR
+        # ).transpose(
+        #     2, 0, 1
+        # )  # HWC -> CHW
+
+        #before
         roi_coord_2d = crop_resize_by_warp_affine(
-            coord_2d, bbox_center, scale, out_res, interpolation=cv2.INTER_LINEAR
-        ).transpose(2, 0, 1)
+            coord_2d, bbox_center, scale, input_res, interpolation=cv2.INTER_LINEAR
+        ).transpose(2, 0, 1)#
 
         ## roi_mask ---------------------------------------
         # (mask_trunc < mask_visib < mask_obj)弄清楚这几个mask
@@ -628,20 +660,15 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
         # roi_xyz = crop_resize_by_warp_affine(xyz, bbox_center, scale, out_res, interpolation=mask_xyz_interp)
         # roi_nxyz=crop_resize_by_warp_affine(nxyz, bbox_center, scale, out_res, interpolation=mask_xyz_interp) #see this function
 
-        #使用本身中心以及测试的比例来训练试一试================
-        bbox_center1 = np.array([0.5 * (x1 + x2), 0.5 * (y1 + y2)])
-        bw1 = max(x2 - x1, 1)
-        bh1 = max(y2 - y1, 1)
-        scale1 = max(bh1, bw1) * cfg.INPUT.DZI_PAD_SCALE
-        scale1 = min(scale1, max(im_H, im_W)) * 1.0#好像在截图的时候并没有考虑到边界框超出图像范围的情况
+       
         
         roi_nxyz=crop_resize_by_warp_affine(nxyz, bbox_center, scale, out_res, interpolation=mask_xyz_interp) #see this function
         # roi_mask_obj = crop_resize_by_warp_affine(
         #     mask_obj[:, :, None], bbox_center1, scale, out_res, interpolation=mask_xyz_interp
         # )#选择mask也放到中心
-        # roi_mask_visib = crop_resize_by_warp_affine(
-        #     mask_visib[:, :, None], bbox_center1, scale, out_res, interpolation=mask_xyz_interp
-        # )
+        roi_mask_visib = crop_resize_by_warp_affine(
+            mask_visib[:, :, None], bbox_center, scale, out_res, interpolation=mask_xyz_interp
+        )
 
         #================================================
         # region label
@@ -761,7 +788,7 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
             )[0]
         else:
             raise ValueError(f"Unknown rot type: {pnp_net_cfg.ROT_TYPE}")
-        dataset_dict["ego_rot"] = torch.as_tensor(pose[:3, :3].astype("float32"))
+        dataset_dict["ego_rot"] = torch.as_tensor(pose[:3, :3].astype("float32")) #also send true ego_rot
         dataset_dict["trans"] = torch.as_tensor(inst_infos["trans"].astype("float32"))# 获取平移--单位mm
         if pnp_net_cfg.PM_LOSS_TYPE!="normal_loss":
             dataset_dict["roi_points"] = torch.as_tensor(self._get_model_points(dataset_name)[roi_cls].astype("float32"))
@@ -788,16 +815,27 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
             obj_center = anno["centroid_2d"]
             delta_c = obj_center - bbox_center
             dataset_dict["trans_ratio"] = torch.as_tensor([delta_c[0] / scale, delta_c[1] / scale, z_ratio]).to(torch.float32)
-        else: #change before
+        else: 
+             #change before
             dataset_dict["bbox_center"] = torch.as_tensor(bbox_center, dtype=torch.float32)
             dataset_dict["scale"] = scale
             dataset_dict["bbox"] = anno["bbox"]  # NOTE: original bbox
-            dataset_dict["roi_wh"] = torch.as_tensor(np.array([bw, bh], dtype=np.float32))
+            dataset_dict["roi_wh"] = torch.as_tensor(np.array([scale, scale], dtype=np.float32))
             dataset_dict["resize_ratio"] = resize_ratio = out_res / scale
             z_ratio = inst_infos["trans"][2] / resize_ratio
             obj_center = anno["centroid_2d"]
             delta_c = obj_center - bbox_center
-            dataset_dict["trans_ratio"] = torch.as_tensor([delta_c[0] / bw, delta_c[1] / bh, z_ratio]).to(torch.float32)
+            dataset_dict["trans_ratio"] = torch.as_tensor([delta_c[0] / scale, delta_c[1] / scale, z_ratio]).to(torch.float32)
+            # #change before
+            # dataset_dict["bbox_center"] = torch.as_tensor(bbox_center, dtype=torch.float32)
+            # dataset_dict["scale"] = scale
+            # dataset_dict["bbox"] = anno["bbox"]  # NOTE: original bbox
+            # dataset_dict["roi_wh"] = torch.as_tensor(np.array([bw, bh], dtype=np.float32))
+            # dataset_dict["resize_ratio"] = resize_ratio = out_res / scale
+            # z_ratio = inst_infos["trans"][2] / resize_ratio
+            # obj_center = anno["centroid_2d"]
+            # delta_c = obj_center - bbox_center
+            # dataset_dict["trans_ratio"] = torch.as_tensor([delta_c[0] / bw, delta_c[1] / bh, z_ratio]).to(torch.float32)
         return dataset_dict
 
     def smooth_xyz(self, xyz):
