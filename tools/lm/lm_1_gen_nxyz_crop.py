@@ -145,12 +145,6 @@ class XyzGen(object):
                     render_obj_id = cls_indexes.index(obj_id)  # 0-based
                     # t=np.array([0,0,1])  #  #固定平移
                     bgr_gl, depth_gl,nomal_img = self.get_renderer().render(render_obj_id, IM_W, IM_H, K, R, t, near, far)#如果固定t则如何呢
-                    # bgr_gl, depth_gl= self.get_renderer().render(render_obj_id, IM_W, IM_H, K, R, t, near, far)
-                    
-                    # cv2.imwrite("after.png",nomal_img)
-
-                    
-                    # mask = (depth_gl > 0).astype("uint8")
 
                     mask1=(nomal_img!=np.array([0,0,0])).astype("uint8")
 
@@ -182,78 +176,6 @@ class XyzGen(object):
                         mmcv.dump(nxyz_info, save_path)
         if self.renderer is not None:
             self.renderer.close()
-
-                        #下面是原函数中的生成xyz的代码
-                        # if mask.sum() == 0:  # NOTE: this should be ignored at training phase
-                        #     print(
-                        #         f"not visible, split {split} scene {scene_id}, im {int_im_id} obj {idx2class[obj_id]} {obj_id}"
-                        #     )
-                        #     print(f"{save_path}")
-                        #     xyz_info = {
-                        #         "xyz_crop": np.zeros((IM_H, IM_W, 3), dtype=np.float16),
-                        #         "xyxy": [0, 0, IM_W - 1, IM_H - 1],
-                        #     }
-                        #     if VIS:
-                        #         im_path = osp.join(
-                        #             data_root,
-                        #             f"{scene_id:06d}/rgb/{int_im_id:06d}.jpg",
-                        #         )
-                        #         im = mmcv.imread(im_path)
-
-                        #         mask_path = osp.join(
-                        #             data_root,
-                        #             f"{scene_id:06d}/mask/{int_im_id:06d}_{anno_i:06d}.png",
-                        #         )
-                        #         mask_visib_path = osp.join(
-                        #             data_root,
-                        #             f"{scene_id:06d}/mask_visib/{int_im_id:06d}_{anno_i:06d}.png",
-                        #         )
-                        #         mask_gt = mmcv.imread(mask_path, "unchanged")
-                        #         mask_visib_gt = mmcv.imread(mask_visib_path, "unchanged")
-
-                        #         show_ims = [
-                        #             bgr_gl[:, :, [2, 1, 0]],
-                        #             im[:, :, [2, 1, 0]],
-                        #             mask_gt,
-                        #             mask_visib_gt,
-                        #         ]
-                        #         show_titles = [
-                        #             "bgr_gl",
-                        #             "im",
-                        #             "mask_gt",
-                        #             "mask_visib_gt",
-                        #         ]
-                        #         grid_show(show_ims, show_titles, row=2, col=2)
-                        #         raise RuntimeError(f"split {split} scene {scene_id}, im {int_im_id}")
-                        # else:
-                        #     x1, y1, x2, y2 = mask2bbox_xyxy(mask)
-                        #     xyz_np = misc.calc_xyz_bp_fast(depth_gl, R, t, K)#by wenhua from depth get xyz_crop
-                        #     xyz_crop = xyz_np[y1 : y2 + 1, x1 : x2 + 1]
-                        #     xyz_info = {
-                        #         "xyz_crop": xyz_crop.astype("float16"),  # save disk space w/o performance drop
-                        #         "xyxy": [x1, y1, x2, y2],
-                        #     }
-
-                            #from crop image get nx,ny,nz
-                            
-
-                            # if VIS:
-                            #     print(f"xyz_crop min {xyz_crop.min()} max {xyz_crop.max()}")
-                            #     show_ims = [
-                            #         bgr_gl[:, :, [2, 1, 0]],
-                            #         # get_emb_show(xyz_np),
-                            #         get_emb_show(nomal_img),
-                            #         get_emb_show(xyz_crop),
-
-                            #     ]
-                            #     show_titles = ["bgr_gl", "xyz", "xyz_crop"]
-                            #     grid_show(show_ims, show_titles, row=1, col=3)
-
-            #             if not args.no_save: #save file
-            #                 mmcv.mkdir_or_exist(osp.dirname(save_path))
-            #                 mmcv.dump(xyz_info, save_path)
-            # if self.renderer is not None:
-            #     self.renderer.close()
 
 
 if __name__ == "__main__":
