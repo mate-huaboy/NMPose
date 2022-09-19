@@ -33,7 +33,7 @@ from .pose_from_pred import pose_from_pred
 from .pose_from_pred_centroid_z import pose_from_pred_centroid_z,trans_from_pred_centroid_z
 from .pose_from_pred_centroid_z_abs import pose_from_pred_centroid_z_abs
 from .resnet_backbone import ResNetBackboneNet, resnet_spec
-from ..losses.rot_normal_loss import PyrotLoss
+
 logger = logging.getLogger(__name__)
 
 
@@ -60,12 +60,10 @@ class GDRN(nn.Module):
               [0, 0, 1]]),device="cuda:0",dtype=torch.float32) 
 
         self.l=np.array([[0,0,1]])
-        self.rot_normalLoss=PyrotLoss()
-        #建议在这里创建一个render?
-        # for dataset_name in cfg.DATASETS.TRAIN:
-        #     self.rot_normalLoss.add_dataset_name(dataset_name)
-        #可以去掉该信息
+      
         if self.cfg.MODEL.CDPN.PNP_NET.ENABLE and False:
+            from ..losses.rot_normal_loss import PyrotLoss
+            self.rot_normalLoss=PyrotLoss()
             self.rot_normalLoss.add_dataset_name( cfg.DATASETS.TRAIN[0])
 
         #
@@ -139,18 +137,17 @@ class GDRN(nn.Module):
         region=None
         
         #add channels
-        if cfg.MODEL.CDPN.BACKBONE.INPUT_CHANNEL==5:
-            x=torch.cat([x,roi_coord_2d],dim=1)
-        # x.shape [bs, 3, 256, 256]
-        if self.concat:
-            features, x_f64, x_f32, x_f16 = self.backbone(x)  # features.shape [bs, 2048, 8, 8]
+        if cfg.MODEL.CDPN.BACKBONE.ENABLED:
+            if cfg.MODEL.CDPN.BACKBONE.INPUT_CHANNEL==5:
+                x=torch.cat([x,roi_coord_2d],dim=1)
+            # x.shape [bs, 3, 256, 256]
+            if self.concat:
+                features, x_f64, x_f32, x_f16 = self.backbone(x)  # features.shape [bs, 2048, 8, 8]
+                
             
-           
-        else:
-            features = self.backbone(x)  # features.shape [bs, 2048, 8, 8]
-            # joints.shape [bs, 1152, 64, 64]
-       
-
+            else:
+                features = self.backbone(x)  # features.shape [bs, 2048, 8, 8]
+                # joints.shape [bs, 1152, 64, 64]
 
         if r_head_cfg.ENABLED and self.concat:
             # joints.shape [bs, 1152, 64, 64]
@@ -188,7 +185,7 @@ class GDRN(nn.Module):
         #normalize            
         coor_feat = torch.cat([coor_x, coor_y, coor_z], dim=1)
         coor_feat=F.normalize(coor_feat,p=2,dim=1)
-        if pnp_net_cfg.ENABLE and not pnp_net_cfg.FREEZE:#需要乘这个mask吗，需要考察，因为遮挡
+        if pnp_net_cfg.ENABLE and not pnp_net_cfg.FREEZE and False:#需要乘这个mask吗，需要考察，因为遮挡
             #加上乘上mask
             yy1=(coor_feat[:,0]*mask[:,0])[:,None]
             yy2=(coor_feat[:,1]*mask[:,0])[:,None]
@@ -341,7 +338,7 @@ class GDRN(nn.Module):
         # )
         #修改为中心的移动
         if  pnp_net_cfg.ENABLE:
-            if pnp_net_cfg.TRUE_NORMAL and False:
+            if pnp_net_cfg.TRUE_NORMAL:
                  pred_rot_, pred_t_ = self.pnp_net(
                 gt_xyz, region=region_atten, extents=roi_extents, mask_attention=mask_atten
             )
@@ -561,7 +558,7 @@ class GDRN(nn.Module):
                 #归一化
                 # coor_feat=F.normalize(coor_feat,p=2,dim=1)
                 cos_simi=F.cosine_similarity(coor_feat,gt_xyz,dim=1)
-                cos_simi=cos_simi*gt_mask_xyz#需要乘以mask（刚加上，但还未验证）,是否要和被遮挡的问题联系起来，很重要
+                # cos_simi=cos_simi*gt_mask_xyz#需要乘以mask（刚加上，但还未验证）,是否要和被遮挡的问题联系起来，很重要
                 # a=cos_simi[0].detach().cpu().numpy()*255
                 # cv2.imwrite("cossim.png",cos_simi[0].detach().cpu().numpy()*255)
 
@@ -858,23 +855,26 @@ def build_model_optimizer(cfg):
     pnp_net_cfg = cfg.MODEL.CDPN.PNP_NET
 
     if "resnet" in backbone_cfg.ARCH:
+        
         params_lr_list = []
         # backbone net
-        block_type, layers, channels, name = resnet_spec[backbone_cfg.NUM_LAYERS]
-        backbone_net = ResNetBackboneNet(
-            block_type, layers, backbone_cfg.INPUT_CHANNEL, freeze=backbone_cfg.FREEZE, rot_concat=r_head_cfg.ROT_CONCAT
-        )
-        if backbone_cfg.FREEZE:
-            for param in backbone_net.parameters():
-                with torch.no_grad():
-                    param.requires_grad = False
-        else:
-            params_lr_list.append(
-                {
-                    "params": filter(lambda p: p.requires_grad, backbone_net.parameters()),
-                    "lr": float(cfg.SOLVER.BASE_LR),
-                }
+        backbone_net=None
+        if cfg.MODEL.CDPN.BACKBONE.ENABLED:
+            block_type, layers, channels, name = resnet_spec[backbone_cfg.NUM_LAYERS]
+            backbone_net = ResNetBackboneNet(
+                block_type, layers, backbone_cfg.INPUT_CHANNEL, freeze=backbone_cfg.FREEZE, rot_concat=r_head_cfg.ROT_CONCAT
             )
+            if backbone_cfg.FREEZE:
+                for param in backbone_net.parameters():
+                    with torch.no_grad():
+                        param.requires_grad = False
+            else:
+                params_lr_list.append(
+                    {
+                        "params": filter(lambda p: p.requires_grad, backbone_net.parameters()),
+                        "lr": float(cfg.SOLVER.BASE_LR),
+                    }
+                )
         rot_head_net=None
         # rotation head net -----------------------------------------------------
         r_out_dim, mask_out_dim, region_out_dim = get_xyz_mask_region_out_dim(cfg)
@@ -1024,13 +1024,14 @@ def build_model_optimizer(cfg):
 
     if cfg.MODEL.WEIGHTS == "":
         ## backbone initialization
-        backbone_pretrained = cfg.MODEL.CDPN.BACKBONE.get("PRETRAINED", "")
-        if backbone_pretrained == "":
-            logger.warning("Randomly initialize weights for backbone!")
-        else:
-            # initialize backbone with official ImageNet weights
-            logger.info(f"load backbone weights from: {backbone_pretrained}")
-            load_checkpoint(model.backbone, backbone_pretrained, strict=False, logger=logger)
+        if cfg.MODEL.CDPN.BACKBONE.ENABLED: 
+            backbone_pretrained = cfg.MODEL.CDPN.BACKBONE.get("PRETRAINED", "")
+            if backbone_pretrained == "":
+                logger.warning("Randomly initialize weights for backbone!")
+            else:
+                # initialize backbone with official ImageNet weights
+                logger.info(f"load backbone weights from: {backbone_pretrained}")
+                load_checkpoint(model.backbone, backbone_pretrained, strict=False, logger=logger)
 
     model.to(torch.device(cfg.MODEL.DEVICE))
     return model, optimizer

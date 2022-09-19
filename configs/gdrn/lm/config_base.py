@@ -1,5 +1,5 @@
 OUTPUT_ROOT = 'output'
-OUTPUT_DIR = 'output7/gdrn/lm/a6_cPnP_lm13'#可以修改
+OUTPUT_DIR = 'output3/gdrn/lm/a6_cPnP_lm13'
 EXP_NAME = ''
 DEBUG = False
 SEED = -1
@@ -27,8 +27,8 @@ INPUT = dict(
     BG_KEEP_ASPECT_RATIO=True,
     DZI_TYPE='uniform',
     DZI_PAD_SCALE=1.5,
-    DZI_SCALE_RATIO=0.25,
-    DZI_SHIFT_RATIO=0.25,
+    DZI_SCALE_RATIO=0.15,
+    DZI_SHIFT_RATIO=0.1,
     SMOOTH_XYZ=False)
 DATASETS = dict(
     TRAIN=('lm_13_train', 'lm_imgn_13_train_1k_per_obj'),
@@ -54,7 +54,8 @@ DATALOADER = dict(
     FILTER_VISIB_THR=0.0)
 SOLVER = dict(
     IMS_PER_BATCH=24,
- 
+    TOTAL_EPOCHS=120,
+    OPTIMIZER_CFG=dict(type='Ranger', lr=0.0001, weight_decay=0),
     GAMMA=0.1,
     BIAS_LR_FACTOR=1.0,
     LR_SCHEDULER_NAME='flat_and_anneal',
@@ -62,6 +63,7 @@ SOLVER = dict(
     WARMUP_FACTOR=0.001,
     WARMUP_ITERS=1000,
     ANNEAL_METHOD='cosine',
+    ANNEAL_POINT=0.6,
     POLY_POWER=0.9,
     REL_STEPS=(0.5, 0.75),
     CHECKPOINT_PERIOD=5,
@@ -71,20 +73,14 @@ SOLVER = dict(
     WEIGHT_DECAY=0,
     OPTIMIZER_NAME='Ranger',
     BASE_LR=0.0001,
-    MOMENTUM=0.9,
-    #================================
-    TOTAL_EPOCHS=160, #可以修改
-    OPTIMIZER_CFG=dict(type='Ranger', lr=0.0001, weight_decay=0),#可以修改
-    ANNEAL_POINT=0.72,  #修改
-    #====================================
-    )
+    MOMENTUM=0.9)
 TRAIN = dict(PRINT_FREQ=500, VERBOSE=False, VIS=False, VIS_IMG=True)
 VAL = dict(
     DATASET_NAME='lm',
     SCRIPT_PATH='lib/pysixd/scripts/eval_pose_results_more.py',
     RESULTS_PATH='',
     TARGETS_FILENAME='lm_test_targets_bb8.json',
-  
+    ERROR_TYPES='ad,rete,re,te,proj',
     RENDERER_TYPE='cpp',
     SPLIT='test',
     SPLIT_TYPE='bb8',
@@ -93,20 +89,18 @@ VAL = dict(
     SCORE_ONLY=False,
     EVAL_PRINT_ONLY=False,
     EVAL_PRECISION=False,
-    USE_BOP=False,
-    ERROR_TYPES='ad,rete,re,te,proj',#可以修改
-      )
+    USE_BOP=False)
 TEST = dict(
     EVAL_PERIOD=0,
     VIS=False,
-    TEST_BBOX_TYPE='est',
+    TEST_BBOX_TYPE='gt',
     PRECISE_BN=dict(ENABLED=False, NUM_ITER=200),
     AMP_TEST=False,
     USE_PNP=False,
     PNP_TYPE='ransac_pnp')
 MODEL = dict(
     DEVICE='cuda',
-    WEIGHTS='output2/gdrn/lm/a6_cPnP_lm13/model_final.pth',
+    WEIGHTS='',
     PIXEL_MEAN=[0.0, 0.0, 0.0],
     PIXEL_STD=[255.0, 255.0, 255.0],
     LOAD_DETS_TEST=True,
@@ -118,13 +112,10 @@ MODEL = dict(
             PRETRAINED='torchvision://resnet34',
             ARCH='resnet',
             NUM_LAYERS=34,
-            INPUT_CHANNEL=3,
             INPUT_RES=256,
             OUTPUT_RES=64,
-            #=========================
-            FREEZE=True
-            #=================================
-            ),#修改
+            INPUT_CHANNEL=3,
+            FREEZE=True),
         ROT_HEAD=dict(
             ROT_CONCAT=False,
             XYZ_BIN=64,
@@ -136,7 +127,7 @@ MODEL = dict(
             OUT_CONV_KERNEL_SIZE=1,
             NUM_CLASSES=13,
             ROT_CLASS_AWARE=False,
-            XYZ_LOSS_TYPE='Cos_smi',
+            XYZ_LOSS_TYPE='L1',
             XYZ_LOSS_MASK_GT='visib',
             XYZ_LW=1.0,
             MASK_CLASS_AWARE=False,
@@ -150,26 +141,21 @@ MODEL = dict(
             REGION_LOSS_TYPE='CE',
             REGION_LOSS_MASK_GT='visib',
             REGION_LW=1.0,
-            #=============================================
-            FREEZE=True,#修改
-            ENABLED=True
-            #=====================================================
-            ),
+            FREEZE=True,
+            ENABLED=False),
         PNP_NET=dict(
-            R_ONLY=True,
             LR_MULT=1.0,
             PNP_HEAD_CFG=dict(
                 type='ConvPnPNet', norm='GN', num_gn_groups=32, drop_prob=0.0),
             REGION_ATTENTION=False,
             MASK_ATTENTION='none',
             TRANS_WITH_BOX_INFO='none',
-            ROT_TYPE='allo_rot6d',
+            ROT_TYPE='ego_log_quat',
             TRANS_TYPE='centroid_z',
             Z_TYPE='REL',
             NUM_PM_POINTS=3000,
-           
-
             PM_SMOOTH_L1_BETA=1.0,
+            PM_LOSS_SYM=True,
             PM_NORM_BY_EXTENT=True,
             PM_R_ONLY=True,
             PM_DISENTANGLE_T=False,
@@ -187,23 +173,17 @@ MODEL = dict(
             TRANS_LW=0.0,
             BIND_LOSS_TYPE='L1',
             BIND_LW=0.0,
-            #==============================================
-            PM_LOSS_SYM=False,  #注意这个参数
-
-            # PM_LOSS_TYPE='normal_loss',#修改
-            PM_LOSS_TYPE='L1',#修改
-            WITH_2D_COORD=False,#修改
-
+            NUM_LAYERS=4,
+            PM_LOSS_TYPE='L1',
+            WITH_2D_COORD=False,
+            R_ONLY=False,
             FREEZE=False,
-            ENABLE=True,#修改
-            CENTER_TRANS=False
-            #===================================================
-            ),#可以修改
+            ENABLE=True,
+            TRUE_NORMAL=True,
+            CENTER_TRANS=False),
         TRANS_HEAD=dict(
-            #====================================
-            ENABLED=True,
-            FREEZE=True,#修改
-            #===========================================
+            ENABLED=False,
+            FREEZE=False,
             LR_MULT=1.0,
             NUM_LAYERS=3,
             NUM_FILTERS=256,
@@ -221,5 +201,5 @@ MODEL = dict(
             TRANS_LW=0.0)),
     KEYPOINT_ON=False,
     LOAD_PROPOSALS=False)
-EXP_ID = 'a6_cPnP_lm13_test'
+EXP_ID = 'a6_cPnP_lm13'
 RESUME = False
