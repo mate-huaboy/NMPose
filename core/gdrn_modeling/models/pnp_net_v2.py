@@ -74,16 +74,18 @@ class ConvPnPNet(nn.Module):
         assert num_layers >= 3, num_layers
         self.features = nn.ModuleList()
         if num_layers>3:
-            featdim1=[128,128,256,256,128]
+            # featdim1=[128,128,256,256,128]
+            featdim1=[128,128,256]
+
         else:
             featdim1=[128,128,128]
-        for i in range(5):
+        for i in range(3):
             _in_channels = nIn if i == 0 else featdim1[i-1]
             self.features.append(nn.Conv2d(_in_channels, featdim1[i], kernel_size=3, stride=2, padding=1, bias=False))
             self.features.append(get_norm(norm, featdim1[i], num_gn_groups=num_gn_groups))
             self.features.append(nn.ReLU(inplace=True))
-        for i in range(num_layers - 5):  # when num_layers > 3
-            self.features.append(nn.Conv2d(featdim1[4], featdim, kernel_size=3, stride=1, padding=1, bias=False))
+        for i in range(num_layers - 3):  # when num_layers > 3
+            self.features.append(nn.Conv2d(featdim1[2], featdim, kernel_size=3, stride=1, padding=1, bias=False))
             self.features.append(get_norm(norm, featdim, num_gn_groups=num_gn_groups))
             self.features.append(nn.ReLU(inplace=True))
 

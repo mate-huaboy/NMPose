@@ -269,12 +269,19 @@ class GDRN(nn.Module):
 
                 coor_feat=F.grid_sample(coor_feat,grid)
                 #
-        coor_x=coor_feat[:,0,]
-        coor_x=coor_x[:,None]
-        coor_y=coor_feat[:,1,:,:]
-        coor_y=coor_y[:,None]
-        coor_z=coor_feat[:,2,:,:]
-        coor_z=coor_z[:,None]
+
+        coor_feat=coor_feat.transpose(1,0)
+        mask1=mask<0.5
+        mask1=mask1.transpose(1,0)
+        coor_feat[:,mask1[0,:,:,:]]=0
+        coor_feat=coor_feat.transpose(1,0)
+        # mask=mask.transpose(1,0)
+        coor_x=coor_feat[:,0:1,]
+        # coor_x=coor_x[:,None]
+        coor_y=coor_feat[:,1:2,:,:]
+        # coor_y=coor_y[:,None]
+        coor_z=coor_feat[:,2:,:,:]
+        # coor_z=coor_z[:,None]
 
 
         # TODO: remove this trans_head_net
@@ -339,13 +346,14 @@ class GDRN(nn.Module):
         #修改为中心的移动
         if  pnp_net_cfg.ENABLE:
             if pnp_net_cfg.TRUE_NORMAL:
-                 pred_rot_, pred_t_ = self.pnp_net(
+                # cv2.imwrite("origin.png",gt_xyz[0].cpu().numpy().transpose(1,2,0)*255)
+                pred_rot_, pred_t_ = self.pnp_net(
                 gt_xyz, region=region_atten, extents=roi_extents, mask_attention=mask_atten
             )
             else:
-                cv2.imwrite("origin.png",gt_xyz[0].cpu().numpy().transpose(1,2,0)*255)
-                cv2.imwrite("img.png",coor_feat[0].cpu().numpy().transpose(1,2,0)*255)
-                cv2.imwrite("dif.png",gt_xyz[0].cpu().numpy().transpose(1,2,0)*255-coor_feat[0].cpu().numpy().transpose(1,2,0)*255)
+                # cv2.imwrite("origin.png",gt_xyz[0].cpu().numpy().transpose(1,2,0)*255)
+                # cv2.imwrite("img.png",coor_feat[0].cpu().numpy().transpose(1,2,0)*255)
+                # cv2.imwrite("dif.png",gt_xyz[0].cpu().numpy().transpose(1,2,0)*255-coor_feat[0].cpu().numpy().transpose(1,2,0)*255)
                 pred_rot_, pred_t_ = self.pnp_net(
                     coor_feat, region=region_atten, extents=roi_extents, mask_attention=mask_atten
                 )

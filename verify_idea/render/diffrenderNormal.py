@@ -7,7 +7,7 @@ import os.path as osp
 import tqdm
 cur_dir=osp.abspath(osp.dirname(__file__))
 sys.path.insert(0,cur_dir)
-from pytorch3d.structures import Meshes
+from pytorch3d.structures import Meshes,Pointclouds
 from ColorShader  import NormalShader
 from pytorch3d.renderer import (
     PerspectiveCameras,
@@ -156,7 +156,7 @@ class DiffRender(nn.Module):
         # )
         s=datetime.datetime.now()
         # mesh=self.mesh.extend(B)
-        mesh.scale_verts_(0.001)
+        # mesh.scale_verts_(0.001)
         target_images = self.renderer(mesh, cameras=cameras,blendParams=self.blend_params) #1*480*640*4
         e=datetime.datetime.now()
         # print((start2-start1).microseconds)
@@ -202,7 +202,8 @@ class DiffRenderer_Normal_Wrapper(nn.Module):
             # verts=m.verts_list()
             # faces=m.faces_list()
             # verts_normals=m.verts_normals_list()
-            V_l.append(m.verts_list()[0])
+            # V_l.append(m.verts_list()[0])
+            V_l.append(m.verts_normals_list()[0])
             F_l.append( m.faces_list()[0])
             v_n=m.verts_normals_list()[0]
             v_n=T[b].view(1,3,3)@v_n[...,None]
@@ -218,12 +219,13 @@ class DiffRenderer_Normal_Wrapper(nn.Module):
             # V_l.append(ite for ite in m.verts_normals_list())
             # F_l.append(ite for ite in m.faces_list())
             # v_n_l.append(ite for ite in m.verts_normals_list())
-        mesh = Meshes(
-            verts=V_l,faces=F_l,verts_normals=v_n_l
-        )
+        # mesh = Meshes(
+        #     verts=V_l,faces=F_l,verts_normals=v_n_l
+        # )
+        Pointclouds(points=V_l)
         # mesh=mesh.extend(2)
         # T=torch.cat([T,gt_T],dim=0)
-        normal_pre = self.renderers[0](T, K, mesh,render_image_size,
+        normal_pre = self.renderers[0](T, K, Pointclouds,render_image_size,
                                                     near, far,render_texture=render_tex)
         # normal_gt=self.renderers[0](gt_T, K, mesh,render_image_size,
         #                                             near, far,render_texture=render_tex)

@@ -4,7 +4,7 @@ from meshio import Mesh
 import numpy as np
 import cv2
 import torch
-from pytorch3d.structures import Meshes
+from pytorch3d.structures import Meshes,Pointclouds
 from pytorch3d.io import IO
 import ColorShader
 from ColorShader import ColorShader, NormalShader
@@ -17,12 +17,17 @@ from pytorch3d.renderer import (
     DirectionalLights,
     AmbientLights,
     RasterizationSettings,
+    PointsRasterizationSettings,
+    AlphaCompositor,
     MeshRenderer,
+    PointsRenderer,
+    PointsRasterizer,
     MeshRasterizer,
     SoftPhongShader,
     SoftSilhouetteShader,
     TexturesVertex,
     BlendParams,
+    FoVOrthographicCameras,
     
 )
 
@@ -39,21 +44,21 @@ w = 640
 
 # Load mesh
 device = torch.device("cuda:0")
-mesh = IO().load_mesh("datasets/BOP_DATASETS/lm/models/obj_000014.ply").to(device)
+mesh = IO().load_mesh("datasets/BOP_DATASETS/lm/models/obj_000011.ply").to(device)
 mesh.scale_verts_(0.001)
 # mesh.scale_verts_(1)
 
 # import ipdb; ipdb.set_trace()
 
 # GT Pose for instance 176
-# R = torch.tensor(
-#    [[1.0,0,0],[0,1.0,0],[0,0,1.0]],
-#     dtype=torch.float32,
-# )
+R = torch.tensor(
+   [[1.0,0,0],[0,1.0,0],[0,0,1.0]],
+    dtype=torch.float32,
+)
 T = torch.tensor([0,0,1], dtype=torch.float32) 
-R_gt=np.array( [-0.175483, 0.98447901, 0.00246469, 0.89255601, 0.160153, -0.42153901, -0.415391, -0.0717731, -0.90680701]).reshape(3,3)
+# R_gt=np.array( [-0.175483, 0.98447901, 0.00246469, 0.89255601, 0.160153, -0.42153901, -0.415391, -0.0717731, -0.90680701]).reshape(3,3)
 # t_gt=np.array(  [107.21688293, -45.40241317, 1014.50072417]).reshape(1,3)/1000
-R=torch.tensor(R_gt)
+# R=torch.tensor(R_gt)
 # T=torch.tensor(t_gt)
 
 sys_T=np.array([-0.999964, -0.00333777, -0.0077452, 0.232611, 0.00321462, -0.999869, 0.0158593, 0.694388, -0.00779712, 0.0158338, 0.999844, -0.0792063, 0, 0, 0, 1] ).reshape(4,4)
@@ -129,7 +134,9 @@ raster_settings = RasterizationSettings(
     perspective_correct=True,
 )
 
-rasterizer = MeshRasterizer(cameras=camera, raster_settings=raster_settings)
+#point handle
+rasterizer=PointsRasterizer(cameras=camera,raster_settings=raster_settings)
+# rasterizer = MeshRasterizer(cameras=camera, raster_settings=raster_settings)
 
 # renderer = MeshRenderer(
 #     rasterizer,
@@ -140,6 +147,39 @@ rasterizer = MeshRasterizer(cameras=camera, raster_settings=raster_settings)
 #         blend_params=blend_params,
 #     ),
 # )
+raster_settings = PointsRasterizationSettings(
+    image_size=512, 
+    radius = 0.003,
+    points_per_pixel = 10
+)
+
+
+# Create a points renderer by compositing points using an alpha compositor (nearer points
+# are weighted more heavily). See [1] for an explanation.
+cameras = FoVOrthographicCameras(device=device, R=R, T=T, znear=0.01)
+
+rasterizer = PointsRasterizer(cameras=cameras ,raster_settings=raster_settings)
+
+
+renderer=PointsRenderer(rasterizer,compositor=AlphaCompositor(background_color=(0, 0, 0)))
+#renderer points
+l=[]
+l.append(mesh.verts_normals_list()[0])
+mesh_nv=mesh.verts_normals_list()[0]
+nv=R.view(3,3).t().view(1,3,3)@mesh_nv[...,None] 
+nv.squeeze_()
+# nv=nv[None]
+nv1=R1.view(3,3).t().view(1,3,3)@mesh_nv[...,None] 
+nv1.squeeze_()
+# nv1=nv1[None]
+# points=Pointclouds(points=l,features=[mesh.verts_normals_list()[0]])
+points=Pointclouds(points=l,features=[nv])
+imge=renderer(points)
+img = imge[0, ..., :3]
+img=img.cpu().numpy()
+cv2.imwrite("point1.png",img*255)
+
+
 renderer = MeshRenderer(
     rasterizer,
     shader=NormalShader(blend_params=blend_params, cameras=camera)

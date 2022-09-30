@@ -1,6 +1,7 @@
 from __future__ import division, print_function
 
 import os
+from pickle import TRUE
 
 os.environ["PYOPENGL_PLATFORM"] = "egl"
 
@@ -159,8 +160,9 @@ class XyzGen(object):
                          }
 
                          if VIS:
-                            cv2.imwrite("before.png",nomal_img)
-                            cv2.imwrite("after.png",nxyz_crop)
+                            cv2.imwrite("bgr.png",bgr_gl*255)
+                            cv2.imwrite("before.png",nomal_img*255)
+                            cv2.imwrite("after.png",nxyz_crop*255)
                             # print(f"xyz_crop min {nxyz_crop.min()} max {nxyz_crop.max()}")
                             show_ims = [
                                 bgr_gl[:, :, [2, 1, 0]],
@@ -187,8 +189,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="gen lm train_pbr xyz")
     parser.add_argument("--split", type=str, default="train", help="split")
     parser.add_argument("--scene", type=str, default="all", help="scene id")
-    parser.add_argument("--vis", default=False, action="store_true", help="vis")
-    parser.add_argument("--no-save", default=False, action="store_true", help="do not save results")
+    parser.add_argument("--vis", default=True, action="store_true", help="vis")
+    parser.add_argument("--no-save", default=True, action="store_true", help="do not save results")
     args = parser.parse_args()
 
     height = IM_H
