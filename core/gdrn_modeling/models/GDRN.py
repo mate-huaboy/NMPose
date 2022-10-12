@@ -164,16 +164,19 @@ class GDRN(nn.Module):
                 # coor_z=coor_feat[:,2,:,:]
                 # coor_z=coor_z[:,None]
         elif r_head_cfg.ENABLED and not self.concat:
+
             mask, coor_x, coor_y, coor_z, region = self.rot_head_net(features)
-            # coor_feat = torch.cat([coor_x, coor_y, coor_z], dim=1)  # BCHW
-            # #归一化
-            # coor_feat=F.normalize(coor_feat,p=2,dim=1)
-            # coor_x=coor_feat[:,0,]
-            # coor_x=coor_x[:,None]
-            # coor_y=coor_feat[:,1,:,:]
-            # coor_y=coor_y[:,None]
-            # coor_z=coor_feat[:,2,:,:]
-            # coor_z=coor_z[:,None]
+            coor_feat = torch.cat([coor_x, coor_y, coor_z], dim=1)  # BCHW
+            #归一化
+            coor_feat=F.normalize(coor_feat,p=2,dim=1)
+            coor_x=coor_feat[:,0,]
+            coor_x=coor_x[:,None]
+            coor_y=coor_feat[:,1,:,:]
+            coor_y=coor_y[:,None]
+            coor_z=coor_feat[:,2,:,:]
+            coor_z=coor_z[:,None]
+            if region is not None:
+                region=F.normalize(region,p=2,dim=1)
         else:
             coor_x=gt_xyz[:,0:1]
             coor_y=gt_xyz[:,1:2]
@@ -182,9 +185,7 @@ class GDRN(nn.Module):
             mask=mask[:,None]
             region=None
 
-        #normalize            
-        coor_feat = torch.cat([coor_x, coor_y, coor_z], dim=1)
-        coor_feat=F.normalize(coor_feat,p=2,dim=1)
+       
         if pnp_net_cfg.ENABLE and not pnp_net_cfg.FREEZE and False:#需要乘这个mask吗，需要考察，因为遮挡
             #加上乘上mask
             yy1=(coor_feat[:,0]*mask[:,0])[:,None]
@@ -268,20 +269,8 @@ class GDRN(nn.Module):
                 # grid=F.affine_grid(Ms,(24,3,64,64))
 
                 coor_feat=F.grid_sample(coor_feat,grid)
-                #
-
-        coor_feat=coor_feat.transpose(1,0)
-        mask1=mask<0.5
-        mask1=mask1.transpose(1,0)
-        coor_feat[:,mask1[0,:,:,:]]=0
-        coor_feat=coor_feat.transpose(1,0)
-        # mask=mask.transpose(1,0)
-        coor_x=coor_feat[:,0:1,]
-        # coor_x=coor_x[:,None]
-        coor_y=coor_feat[:,1:2,:,:]
-        # coor_y=coor_y[:,None]
-        coor_z=coor_feat[:,2:,:,:]
-        # coor_z=coor_z[:,None]
+                
+        
 
 
         # TODO: remove this trans_head_net
@@ -290,7 +279,6 @@ class GDRN(nn.Module):
         
         bs = x.shape[0]
         num_classes = r_head_cfg.NUM_CLASSES
-
         out_res = cfg.MODEL.CDPN.BACKBONE.OUTPUT_RES
 
         if r_head_cfg.ROT_CLASS_AWARE:  #what mean?
@@ -328,32 +316,60 @@ class GDRN(nn.Module):
             coor_feat = torch.cat([coor_feat, roi_coord_2d], dim=1)
 
         # NOTE: for region, the 1st dim is bg
-        if r_head_cfg.REGION_ATTENTION:
-            region_softmax = F.softmax(region[:, 1:, :, :], dim=1)
-        else: region=None
+        #where will delelte
+        # if r_head_cfg.REGION_ATTENTION:
+        #     region_softmax = F.softmax(region[:, 1:, :, :], dim=1)
+        # else: region=None
 
         mask_atten = None
         if pnp_net_cfg.MASK_ATTENTION != "none":
             mask_atten = get_mask_prob(cfg, mask)
 
-        region_atten = None
-        if pnp_net_cfg.REGION_ATTENTION:
-            region_atten = region_softmax
+        region_atten = region
+        # if pnp_net_cfg.REGION_ATTENTION:
+        #     region_atten = region_softmax
 
         # pred_rot_, pred_t_ = self.pnp_net(
         #     coor_feat, region=region_atten, extents=roi_extents, mask_attention=mask_atten
         # )
         #修改为中心的移动
         if  pnp_net_cfg.ENABLE:
-            if pnp_net_cfg.TRUE_NORMAL:
+            if pnp_net_cfg.TRUE_NORMAL and False:
                 # cv2.imwrite("origin.png",gt_xyz[0].cpu().numpy().transpose(1,2,0)*255)
                 pred_rot_, pred_t_ = self.pnp_net(
                 gt_xyz, region=region_atten, extents=roi_extents, mask_attention=mask_atten
             )
             else:
-                # cv2.imwrite("origin.png",gt_xyz[0].cpu().numpy().transpose(1,2,0)*255)
-                # cv2.imwrite("img.png",coor_feat[0].cpu().numpy().transpose(1,2,0)*255)
-                # cv2.imwrite("dif.png",gt_xyz[0].cpu().numpy().transpose(1,2,0)*255-coor_feat[0].cpu().numpy().transpose(1,2,0)*255)
+               
+                # with torch.no_grad():
+                #add mask================================
+                # coor_feat=coor_feat.transpose(1,0)#cbwh
+                # mask1=gt_mask_visib<0.5
+                # coor_feat[:,mask1[:,:,:]]=0# qiankaobe
+
+                # # mask1=mask<0.5#bcwh
+                # # mask1=mask1.transpose(1,0)#cbwh
+                # # coor_feat[:,mask1[0,:,:,:]]=0
+
+                # coor_feat=coor_feat.transpose(1,0)#bcwh
+                # # mask=mask.transpose(1,0)
+                # # coor_x=coor_feat[:,0:1,]
+                # # coor_x=coor_x[:,None]
+                # # coor_y=coor_feat[:,1:2,:,:]
+                # # coor_y=coor_y[:,None]
+                # # coor_z=coor_feat[:,2:,:,:]
+                # # same add mask on region
+                # region=region.transpose(1,0)
+                # region[:,mask1[:,:,:]]=0
+                # # region[:,mask1[0,:,:,:]]=0
+                # region=region.transpose(1,0)
+                #======================================
+                # i=(roi_classes==7).nonzero().cpu().numpy()
+                # i =int(i[0]) if not len(i)==0 else 0 
+                # cv2.imwrite("origin.png",gt_xyz[i].cpu().numpy().transpose(1,2,0)*255)
+                # cv2.imwrite("img.png",coor_feat[i].detach().cpu().numpy().transpose(1,2,0)*255)
+                # cv2.imwrite("dif.png",gt_xyz[i].cpu().numpy().transpose(1,2,0)*255-coor_feat[0].detach().cpu().numpy().transpose(1,2,0)*255)
+                # cv2.imwrite("region.png",region[i].detach().cpu().numpy().transpose(1,2,0)*255)
                 pred_rot_, pred_t_ = self.pnp_net(
                     coor_feat, region=region_atten, extents=roi_extents, mask_attention=mask_atten
                 )
@@ -476,8 +492,6 @@ class GDRN(nn.Module):
                 sym_infos=sym_infos,
                 extents=roi_extents,
                 roi_classes=roi_classes,
-
-
                 roi_cams=roi_cams,
             )
 
@@ -566,17 +580,20 @@ class GDRN(nn.Module):
                 #归一化
                 # coor_feat=F.normalize(coor_feat,p=2,dim=1)
                 cos_simi=F.cosine_similarity(coor_feat,gt_xyz,dim=1)
-                # cos_simi=cos_simi*gt_mask_xyz#需要乘以mask（刚加上，但还未验证）,是否要和被遮挡的问题联系起来，很重要
-                # a=cos_simi[0].detach().cpu().numpy()*255
-                # cv2.imwrite("cossim.png",cos_simi[0].detach().cpu().numpy()*255)
+                valid_mask = gt_mask_xyz[:, :, :].float() \
+                         * (cos_simi.detach() < 0.999).float() \
+                         * (cos_simi.detach() > -0.999).float()
+                cos_simi=cos_simi[valid_mask>0.5]
+                ll=torch.acos(cos_simi)
+                loss_dict["loss_coor"]=torch.mean(ll)
 
-                # cos_simi=cos_simi#需要乘以mask（刚加上，但还未验证）
-                # mask=(cos_simi!=0)
-                cos_simi=cos_simi.sum()/gt_mask_xyz.sum()#这样就比一大了
-                # cos_simi=cos_simi.sum()/gt_mask_xyz.sum().float().clamp(min=1.0)#这样就比一大了
-                cos_simi=cos_simi.arccos()
+                # cos_simi=cos_simi[gt_mask_xyz>0.5].sum()/gt_mask_xyz.sum()#这样就比一大了
+                # if not -1<cos_simi<1:
+                #     print(cos_simi)
+                # # cos_simi=cos_simi.sum()/gt_mask_xyz.sum().float().clamp(min=1.0)#这样就比一大了
+                # cos_simi=cos_simi.arccos()
                 # print(cos_simi)
-                loss_dict["loss_coor"]= cos_simi #
+                # loss_dict["loss_coor"]= cos_simi #
                 
                 
             else:
@@ -628,6 +645,7 @@ class GDRN(nn.Module):
                 loss_dict["loss_mask"] = nn.BCEWithLogitsLoss(reduction="mean")(out_mask[:, 0, :, :], gt_mask)
             elif mask_loss_type == "CE":
                 loss_dict["loss_mask"] = nn.CrossEntropyLoss(reduction="mean")(out_mask, gt_mask.long())
+
             else:
                 raise NotImplementedError(f"unknown mask loss type: {mask_loss_type}")
             loss_dict["loss_mask"] *= r_head_cfg.MASK_LW
@@ -647,6 +665,44 @@ class GDRN(nn.Module):
                     loss_dict["loss_region"] *= r_head_cfg.REGION_LW#其实可以直接将这部分的loss乘以0即可
                 # else:
                 #     loss_dict["loss_region"]=loss_func(torch.tensor([0]),torch.tensor([1]))
+            elif region_loss_type == "R_cos":
+                gl2cv=torch.tensor(np.array([[-1.0,0,0],[0,-1.0,0],[0,0,1]],dtype=np.float32),device="cuda:0")
+                gl2cv=gl2cv.repeat(gt_rot.shape[0],1,1)
+                # with torch.no_grad():
+                coor_feat1=torch.permute(coor_feat,(0,2,3,1))#==>bwhc
+                coor_feat1=coor_feat1[...,None]
+                gt_rot_t=torch.matmul(gl2cv,gt_rot)
+                gt_rot_t=torch.permute(gt_rot_t,(0,2,1))#qiankaobe
+                gt_rot_t=gt_rot_t.view(coor_feat1.shape[0],1,1,3,3)
+                coor_feat1=torch.matmul(gt_rot_t,coor_feat1)
+                coor_feat1=coor_feat1.squeeze()
+                coor_feat1= torch.permute(coor_feat1,(0,3,1,2))
+                # i=(roi_classes==7).nonzero().cpu().numpy()
+                # i =int(i[0]) if not len(i)==0 else 0 
+                # gt_xyz1=torch.permute(gt_xyz,(0,3,2,1))
+                # gt_xyz1=gt_xyz1[...,None]
+                # gt_xyz1=torch.matmul(gt_rot_t,gt_xyz1)
+                # gt_xyz1=gt_xyz1.squeeze()
+                # gt_xyz1= torch.permute(gt_xyz1,(0,3,1,2))
+                # cv2.imwrite("origin_change.png",(gt_xyz1[i].cpu().numpy().transpose(1,2,0)+1)*255/2)
+                # cv2.imwrite("img1.png",(coor_feat1[i].detach().cpu().numpy().transpose(1,2,0)+1)*255/2)
+                # cv2.imwrite("img2.png",(out_region[i].detach().cpu().numpy().transpose(1,2,0)+1)*255/2)
+                cos_simi=F.cosine_similarity(coor_feat1,out_region,dim=1)
+                valid_mask = gt_mask_xyz[:,:, :].float() \
+                         * (cos_simi.detach() < 0.999).float() \
+                         * (cos_simi.detach() > -0.999).float()
+                cos_simi=cos_simi[valid_mask>0.5]
+                ll=torch.acos(cos_simi)
+                loss_dict["R_loss_region"]=torch.mean(ll)
+                
+                # cos_simi=cos_simi.sum()/gt_mask_xyz.sum()#这样就比一大了
+                # # cos_simi=cos_simi.sum()/gt_mask_xyz.sum().float().clamp(min=1.0)#这样就比一大了
+                # if not -1<cos_simi<1:
+                #     print(cos_simi)
+                # cos_simi=cos_simi.arccos()
+                # loss_dict["R_loss_region"]=cos_simi
+
+                # pass
             else:
                 raise NotImplementedError(f"unknown region loss type: {region_loss_type}")
                 
@@ -704,7 +760,33 @@ class GDRN(nn.Module):
                         
 
                 #============================================================================
+                elif pnp_net_cfg.PM_LOSS_TYPE=="R_normal_loss":
+                    coor_feat = torch.cat([out_x, out_y, out_z], dim=1)#这里后面要改
+                    gt_mask_xyz = gt_masks[r_head_cfg.XYZ_LOSS_MASK_GT]#visib
+                    coor_feat1=torch.permute(coor_feat,(0,2,3,1))
+                    coor_feat1=coor_feat1[...,None]
+                    gt_rot_t=torch.permute(out_rot,(0,1,2))
+                    gt_rot_t=gt_rot_t.view(coor_feat1.shape[0],1,1,3,3)
+                    coor_feat1=torch.matmul(gt_rot_t,coor_feat1)
+                    coor_feat1=coor_feat1.squeeze()
+                    coor_feat1= torch.permute(coor_feat1,(0,3,1,2))
+                    # i=(roi_classes==3).nonzero().cpu().numpy()
+                    # i =int(i[0]) if not len(i)==0 else 0 
+                    # gt_xyz1=torch.permute(gt_xyz,(0,2,3,1))
+                    # gt_xyz1=gt_xyz1[...,None]
+                    # gt_xyz1=torch.matmul(gt_rot_t,gt_xyz1)
+                    # gt_xyz1=gt_xyz1.squeeze()
+                    # gt_xyz1= torch.permute(gt_xyz1,(0,3,1,2))
+                    # cv2.imwrite("origin_change.png",gt_xyz1[0].cpu().numpy().transpose(1,2,0)*255)
+                    # cv2.imwrite("img1.png",(coor_feat1[i].detach().cpu().numpy().transpose(1,2,0)+1)*255/2)
+                    # cv2.imwrite("img2.png",(out_region[i].detach().cpu().numpy().transpose(1,2,0)+1)*255/2)
+                    # coor_feat1.dequantize()
+                    cos_simi=F.cosine_similarity(coor_feat1,out_region,dim=1)
 
+                    cos_simi=cos_simi.sum()/gt_mask_xyz.sum()#这样就比一大了
+                    # cos_simi=cos_simi.sum()/gt_mask_xyz.sum().float().clamp(min=1.0)#这样就比一大了
+                    cos_simi=cos_simi.arccos()
+                    loss_dict["R_normal_region"]=cos_simi
                 else:
                     assert (gt_points is not None) and (gt_trans is not None) and (gt_rot is not None)
                     loss_func = PyPMLoss(#看这里的误差计算,融合预测旋转和平移是还包括了平移在3d点上的 误差评估？
@@ -959,7 +1041,7 @@ def build_model_optimizer(cfg):
                 pnp_net_in_channel += 2
 
             if pnp_net_cfg.REGION_ATTENTION:
-                pnp_net_in_channel += r_head_cfg.NUM_REGIONS
+                pnp_net_in_channel += r_head_cfg.NUM_REGIONS+1
 
             if pnp_net_cfg.MASK_ATTENTION in ["concat"]:  # do not add dim for none/mul
                 pnp_net_in_channel += 1

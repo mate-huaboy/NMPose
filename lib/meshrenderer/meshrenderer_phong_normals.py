@@ -195,7 +195,8 @@ class Renderer(object):#弄明白通道和缓冲区的设置
         glNamedFramebufferReadBuffer(self._fbo.id, GL_COLOR_ATTACHMENT2)
         # bgr_flipped = np.frombuffer(glReadPixels(0, 0, W, H, GL_BGR, GL_UNSIGNED_BYTE), dtype=np.uint8).reshape(H, W, 3)
         
-        bgr_flipped = np.frombuffer(glReadPixels(0, 0, W, H, GL_BGR, GL_FLOAT), dtype=np.float32).reshape(H, W, 3)
+        #change to rgb
+        bgr_flipped = np.frombuffer(glReadPixels(0, 0, W, H, GL_RGB, GL_FLOAT), dtype=np.float32).reshape(H, W, 3)
         
         bgr_normal = np.flipud(bgr_flipped).copy()
 

@@ -16,13 +16,15 @@ sys.path.insert(0, osp.join(cur_dir, "../"))
 # from core.utils.data_utils import denormalize_image
 from core.utils.data_utils import crop_resize_by_warp_affine
 # nxyz_path="datasets/lm_imgn/nxyz_crop_imgn/eggbox/000003_0-nxyz.pkl"
-nxyz_path="datasets/lm_imgn/nxyz_crop_imgn/ape/000005_0-nxyz.pkl"
-# nxyz_path1="datasets/BOP_DATASETS/lm/test/nxyz_crop2/000001/000000_000000-nxyz.pkl"
+# nxyz_path="datasets/lm_imgn/nxyz_crop_imgn/ape/000005_0-nxyz.pkl"
+nxyz_path="datasets/BOP_DATASETS/lm/test/nxyz_crop/000001/000000_000000-nxyz.pkl"
+nxyz_path1="datasets/BOP_DATASETS/lm/test/nxyz_crop-obj/000001/000000_000000-nxyz.pkl"
 
 #z to out ,x to down,y to right
 
 nxyz_info = mmcv.load(nxyz_path)
 x1, y1, x2, y2 = nxyz_info["nxyxy"]
+print(nxyz_info["nxyxy"])
 # float16 does not affect performance (classification/regresion)
 nxyz_crop = nxyz_info["nxyz_crop"]
 nxyz = np.zeros((480, 640, 3), dtype=np.float32)
@@ -35,16 +37,21 @@ scale1 = min(scale1, max(480, 640)) * 1.0#好像在截图的时候并没有考�
 
 roi_nxyz1=crop_resize_by_warp_affine(nxyz, bbox_center1, scale1, 64, interpolation=cv2.INTER_LINEAR) #see this function
 y=np.linalg.norm(nxyz_crop,axis=2,keepdims=True)#see normalized or not
-t1=y>0.995
+t1=y>0.99
 t2=y<1.005
 t=t1 *t2
 imwrite("normalize.png",y*t*255)
 
-ma=nxyz_crop[:,:,0]<0
-imwrite("origon.png",nxyz_crop[...,0]*255)
-imwrite("two_type_normal_diff.png",-nxyz_crop[...,0]*ma*255)
+ma=nxyz_crop[:,:,2]<0
+imwrite("origon.png",nxyz_crop*255)
+imwrite("two_type_normal_diff.png",-nxyz_crop[...,2]*ma*255)
 
-
+nxyz_info1 = mmcv.load(nxyz_path1)
+print(nxyz_info1["nxyxy"])
+# float16 does not affect performance (classification/regresion)
+nxyz_crop1 = nxyz_info["nxyz_crop"]
+nxyz_crop1=nxyz_crop1[:,:,::-1]
+imwrite("origon_ojb.png",nxyz_crop1*255)
 
 
 nxyz_info1 = mmcv.load(nxyz_path1)

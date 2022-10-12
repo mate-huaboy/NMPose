@@ -19,6 +19,23 @@ out vec3 v_L;
 out vec3 v_normal;
 
 void main(void) {
+	vec4 P = view * vec4(position, 1.0);
+	v_view = -P.xyz;
+	gl_Position = projection * P;
+	v_color = color;
+
+	//mat4 u_nm = transpose(inverse(view));
+	mat4 u_nm = view;
+
+
+	vec3 v_eye_pos = P.xyz; // Vertex position in eye coords.
+	v_L = normalize(u_light_eye_pos - v_eye_pos); // Vector to the light
+	//v_normal = normalize(u_nm * vec4(normal, 1.0)).xyz; // Normal in eye coords. sure??
+	v_normal = normalize((u_nm * vec4(normal, 1.0)).xyz); // Normal in eye coords. sure??
+}
+
+void main02(void) {
+	//try to get normal project
 	
 	v_normal=normalize(normal);//normal in objects
 	vec3 position1=v_normal;
@@ -35,6 +52,7 @@ void main(void) {
 }
 
 void main01(void) {
+	// get normal in objects
 	vec4 P = view * vec4(position, 1.0);
 	v_view = -P.xyz;
 	gl_Position = projection * P;

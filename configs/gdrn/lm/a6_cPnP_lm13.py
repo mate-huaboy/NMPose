@@ -1,5 +1,5 @@
 _base_ = ["config_base.py"]
-OUTPUT_DIR = "output10/gdrn/lm/a6_cPnP_lm13"#改变一下输出路径以同时跑两个
+OUTPUT_DIR = "output18/gdrn/lm/a6_cPnP_lm13"#改变一下输出路径以同时跑两个
 INPUT = dict(
   DZI_SCALE_RATIO=0.15,
  DZI_SHIFT_RATIO=0.1,
@@ -21,6 +21,9 @@ MODEL = dict(
             ENABLED=True,#去掉旋转tou
             FREEZE=False,  #同时不训练
             XYZ_LOSS_TYPE='Cos_smi',
+            REGION_ATTENTION=True,
+            NUM_REGIONS=2,
+            REGION_LOSS_TYPE='R_cos',#"CE"
         ),
         PNP_NET=dict(     
             FREEZE=False,
@@ -29,10 +32,11 @@ MODEL = dict(
             CENTER_TRANS=False,
             WITH_2D_COORD=False,#加上这个2d对应
             ROT_TYPE="allo_rot6d",
-            TRUE_NORMAL=False,
-             PM_LOSS_TYPE='L1',
-             NUM_LAYERS=4,
-             MASK_ATTENTION='none'
+            TRUE_NORMAL=True,
+            PM_LOSS_TYPE='L1',#"R_normal_loss",
+            NUM_LAYERS=4,
+            MASK_ATTENTION='none',
+            REGION_ATTENTION=True
         ),
         TRANS_HEAD=dict(  ENABLED=False,
             FREEZE=False,),

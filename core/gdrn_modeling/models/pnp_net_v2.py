@@ -74,8 +74,9 @@ class ConvPnPNet(nn.Module):
         assert num_layers >= 3, num_layers
         self.features = nn.ModuleList()
         if num_layers>3:
-            # featdim1=[128,128,256,256,128]
-            featdim1=[128,128,256]
+            # featdim1=[128,128,256,256,128]#6
+            # featdim1=[128,128,256,128]#5
+            featdim1=[128,128,256]#4
 
         else:
             featdim1=[128,128,128]

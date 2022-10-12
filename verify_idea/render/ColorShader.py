@@ -35,7 +35,7 @@ def normal_shading(
     # )
     ones = torch.ones_like(fragments.bary_coords)
     pixel_normals = interpolate_face_attributes(
-        fragments.pix_to_face, ones, faces_normals
+        fragments.pix_to_face, fragments.bary_coords, faces_normals
     )
     return pixel_normals
 

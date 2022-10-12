@@ -7,7 +7,7 @@ os.environ["PYOPENGL_PLATFORM"] = "egl"
 
 import os.path as osp
 import sys
-
+import torch
 import mmcv
 import numpy as np
 from tqdm import tqdm
@@ -17,7 +17,10 @@ cur_dir = osp.abspath(osp.dirname(__file__))
 PROJ_ROOT = osp.join(cur_dir, "../..")
 sys.path.insert(0, PROJ_ROOT)
 # from lib.meshrenderer.meshrenderer_phong import Renderer
-from lib.meshrenderer.meshrenderer_phong_normals import Renderer
+# from lib.meshrenderer.meshrenderer_phong_normals import Renderer
+from verify_idea.render.diffrenderNormal import DiffRenderer_Normal_Wrapper
+
+# from core.gdrn_modeling.losses.diff_render.diffrenderNormal import DiffRenderer_Normal_Wrapper
 from lib.vis_utils.image import grid_show
 from lib.pysixd import misc
 from lib.utils.mask_utils import mask2bbox_xyxy
@@ -64,7 +67,6 @@ scenes = [i for i in range(1, 15 + 1)]   #场景
 # xyz_root = osp.normpath(osp.join(PROJ_ROOT, "datasets/BOP_DATASETS/lm/train_pbr/xyz_crop"))
 xyz_root = osp.normpath(osp.join(PROJ_ROOT, "datasets/BOP_DATASETS/lm/test/nxyz_crop"))
 
-K = np.array([[572.4114, 0, 325.2611], [0, 573.57043, 242.04899], [0, 0, 1]])  #这里可能要改
 
 
 def normalize_to_01(img):
@@ -105,9 +107,12 @@ class XyzGen(object):
             # self.renderer = Renderer(
             #     model_paths, vertex_tmp_store_folder=osp.join(PROJ_ROOT, ".cache"), vertex_scale=0.001
             # )
-            self.renderer = Renderer(
-                model_paths, vertex_tmp_store_folder=osp.join(PROJ_ROOT, ".cache")
-            )
+            # self.renderer = Renderer(
+            #     model_paths, vertex_tmp_store_folder=osp.join(PROJ_ROOT, ".cache")
+            # )
+            self.renderer=DiffRenderer_Normal_Wrapper(
+            model_paths,device="cuda"
+        )
         return self.renderer
 
     def main(self):
@@ -115,7 +120,8 @@ class XyzGen(object):
         scene = self.scene  # "all" or a single scene
         sel_scene_ids = self.sel_scene_ids
         data_root = self.data_root
-
+        K = np.array([[572.4114, 0, 325.2611], [0, 573.57043, 242.04899], [0, 0, 1]])  #这里可能要改
+        K=K[None]
         for scene_id in tqdm(sel_scene_ids, postfix=f"{split}_{scene}"):
             print("split: {} scene: {}".format(split, scene_id))
             scene_root = osp.join(data_root, f"{scene_id:06d}")
@@ -145,10 +151,19 @@ class XyzGen(object):
 
                     render_obj_id = cls_indexes.index(obj_id)  # 0-based
                     # t=np.array([0,0,1])  #  #固定平移
-                    bgr_gl, depth_gl,nomal_img = self.get_renderer().render(render_obj_id, IM_W, IM_H, K, R, t, near, far)#如果固定t则如何呢
-
+                    T=np.eye(4)
+                    T[:3,:3]=R
+                    T[:3,3]=t
+                    T=T[None]
+                    
+                    T=torch.tensor(T,device='cuda:0',dtype=torch.float32)
+                    K=torch.tensor(K,device='cuda:0',dtype=torch.float32)
+                    # T=T[:,:3,:3]
+                    nomal_img = self.get_renderer()([render_obj_id],T,K,(IM_W,IM_H),near,far)#如果固定t则如何呢
+                    nomal_img=nomal_img.cpu().numpy()
+                    nomal_img=nomal_img[0]
                     mask1=(nomal_img!=np.array([0,0,0])).astype("uint8")
-
+                    
                     if mask1.sum()==0:
                         continue
                     else:
@@ -160,24 +175,28 @@ class XyzGen(object):
                          }
 
                          if VIS:
-                            cv2.imwrite("bgr.png",bgr_gl*255)
+                            nxyz_org=mmcv.load(save_path)
+                            nxyz_crop_org=nxyz_org["nxyz_crop"]
+                            cv2.imwrite("nxyz_crop_org.png",nxyz_crop_org*255)
+                            # cv2.imwrite("bgr.png",bgr_gl*255)
                             cv2.imwrite("before.png",nomal_img*255)
                             cv2.imwrite("after.png",nxyz_crop*255)
                             # print(f"xyz_crop min {nxyz_crop.min()} max {nxyz_crop.max()}")
-                            show_ims = [
-                                bgr_gl[:, :, [2, 1, 0]],
-                                # get_emb_show(xyz_np),
-                                get_emb_show(nomal_img),
-                                get_emb_show(nxyz_crop),
+                            # show_ims = [
+                            #     # bgr_gl[:, :, [2, 1, 0]],
+                            #     # get_emb_show(xyz_np),
+                            #     get_emb_show(nomal_img),
+                            #     get_emb_show(nxyz_crop),
 
-                            ]
-                            show_titles = ["bgr_gl", "nxyz", "nxyz_crop"]
-                            grid_show(show_ims, show_titles, row=1, col=3)
+                            # ]
+                            # show_titles = ["bgr_gl", "nxyz", "nxyz_crop"]
+                            # grid_show(show_ims, show_titles, row=1, col=3)
                     if not args.no_save: #save file
                         mmcv.mkdir_or_exist(osp.dirname(save_path))
                         mmcv.dump(nxyz_info, save_path)
         if self.renderer is not None:
-            self.renderer.close()
+            # self.renderer.close()
+            pass
 
 
 if __name__ == "__main__":

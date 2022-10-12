@@ -336,7 +336,7 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
                     mask_trunc = None
 
         # NOTE: maybe add or change color augment here ===================================
-        if self.split == "train" and self.color_aug_prob > 0 and self.color_augmentor is not None:
+        if self.split == "train" and self.color_aug_prob > 0 and self.color_augmentor is not None:#
             if np.random.rand() < self.color_aug_prob:
                 if cfg.INPUT.COLOR_AUG_SYN_ONLY and img_type not in ["real"]:
                     image = self._color_aug(image, self.color_aug_type)
@@ -449,11 +449,7 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
                     roi_infos["scale"].append(scale)
                     roi_infos["roi_wh"].append(np.array([scale, scale], dtype=np.float32))
                     roi_infos["resize_ratio"].append(out_res/ scale)
-                    #change before
-                    # roi_infos["bbox_center"].append(bbox_center.astype("float32"))
-                    # roi_infos["scale"].append(scale)
-                    # roi_infos["roi_wh"].append(np.array([bw, bh], dtype=np.float32))
-                    # roi_infos["resize_ratio"].append(out_res / scale)  #当旋转和平移bu'fen
+                   
 
                 # CHW, float32 tensor
                 # roi_image
@@ -636,7 +632,7 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
         else:
             mask_trunc = mask_visib * mask_trunc.astype("float32")
 
-        if cfg.TRAIN.VIS:
+        if cfg.TRAIN.VIS or True:
             mask_xyz_interp = cv2.INTER_LINEAR
         else:
             mask_xyz_interp = cv2.INTER_NEAREST
@@ -672,49 +668,14 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
 
         #================================================
         # region label
-        if r_head_cfg.NUM_REGIONS > 1:
+        if r_head_cfg.NUM_REGIONS > 1 and False:#qudiao
             fps_points = self._get_fps_points(dataset_name)[roi_cls]
             roi_region = xyz_to_region(roi_xyz, fps_points)  # HW  这里好像用不上
             dataset_dict["roi_region"] = torch.as_tensor(roi_region.astype(np.int32)).contiguous()
 
         # roi_xyz = roi_xyz.transpose(2, 0, 1)  # HWC-->CHW
         roi_nxyz=roi_nxyz.transpose(2,0,1)  #
-        #====================================================================
-        # t_nxyz=nxyz.astype(np.uint)
-        # cv2.imwrite("nxyz.png",t_nxyz)
-        # # cv2.waitKey(0)
-        # troi_nxyz=roi_nxyz.astype(np.uint)
-        # troi_nxyz=troi_nxyz.transpose(1,2,0)
-        # cv2.imwrite("roi_nxyz.png",troi_nxyz)
-        # tmask=roi_mask_obj.astype(np.uint)*255
-        # cv2.imwrite("mask_obj.png",tmask)
-        # cv2.waitKey(0)
-        #=====================================================================
-        # normalize xyz to [0, 1] using extent   bywenhua---extent is what ,how to get normalize?这样感觉有问题
-        # roi_xyz[0] = roi_xyz[0] / roi_extent[0] + 0.5
-        # roi_xyz[1] = roi_xyz[1] / roi_extent[1] + 0.5
-        # roi_xyz[2] = roi_xyz[2] / roi_extent[2] + 0.5
-
-        #normalize too for nxyz   not right   ,可以再加一个单位化的操作--利用二范数函数
-        # roi_nxyz[0][roi_mask_obj!=0] = (roi_nxyz[0][roi_mask_obj!=0] / 255 -0.5)*2
-        # roi_nxyz[1][roi_mask_obj==1] = (roi_nxyz[1][roi_mask_obj!=0] / 255 -0.5)*2 
-        # roi_nxyz[2][roi_mask_obj==1] = (roi_nxyz[2] [roi_mask_obj!=0]/ 255 -0.5)*2 
-        #再单位化
-        # y=np.linalg.norm(roi_nxyz,axis=0,keepdims=True)
-        #这里求一次mask，因为怀疑不是一样
-        # roi_mask_obj1 = ((roi_nxyz[0,:, :,] != 0) | (roi_nxyz[1,:, :] != 0) | (roi_nxyz[2,:, :] != 0)).astype(np.bool).astype(np.float32)
-        # roi_nxyz[0][roi_mask_obj1!=0]=roi_nxyz[0][roi_mask_obj1!=0]/y[0][roi_mask_obj1!=0]
-        # roi_nxyz[1][roi_mask_obj1!=0]=roi_nxyz[1][roi_mask_obj1!=0]/y[0][roi_mask_obj1!=0]
-        # roi_nxyz[2][roi_mask_obj1!=0]=roi_nxyz[2][roi_mask_obj1!=0]/y[0][roi_mask_obj1!=0]
-
-        # roi_nxyz[:][roi_mask_obj==1]=roi_nxyz[:][roi_mask_obj==1]/y[0][roi_mask_obj==1]
-        
-        # print(roi_nxyz[0][34][30])
-        # print(roi_nxyz[1][34][30])
-        # print(roi_nxyz[2][34][30])
-        # # print(roi_nxyz[0][34][30])
-        # print(np.linalg.norm(np.array([roi_nxyz[0][34][30],roi_nxyz[1][34][30],roi_nxyz[2][34][30]])))
-
+    
         #remove xyz======================================
         roi_xyz=None
         if ("CE" in r_head_cfg.XYZ_LOSS_TYPE) or ("cls" in cfg.MODEL.CDPN.NAME):  # convert target to int for cls
@@ -816,7 +777,7 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
             delta_c = obj_center - bbox_center
             dataset_dict["trans_ratio"] = torch.as_tensor([delta_c[0] / scale, delta_c[1] / scale, z_ratio]).to(torch.float32)
         else: 
-             #change before
+             
             dataset_dict["bbox_center"] = torch.as_tensor(bbox_center, dtype=torch.float32)
             dataset_dict["scale"] = scale
             dataset_dict["bbox"] = anno["bbox"]  # NOTE: original bbox
@@ -826,16 +787,7 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
             obj_center = anno["centroid_2d"]
             delta_c = obj_center - bbox_center
             dataset_dict["trans_ratio"] = torch.as_tensor([delta_c[0] / scale, delta_c[1] / scale, z_ratio]).to(torch.float32)
-            # #change before
-            # dataset_dict["bbox_center"] = torch.as_tensor(bbox_center, dtype=torch.float32)
-            # dataset_dict["scale"] = scale
-            # dataset_dict["bbox"] = anno["bbox"]  # NOTE: original bbox
-            # dataset_dict["roi_wh"] = torch.as_tensor(np.array([bw, bh], dtype=np.float32))
-            # dataset_dict["resize_ratio"] = resize_ratio = out_res / scale
-            # z_ratio = inst_infos["trans"][2] / resize_ratio
-            # obj_center = anno["centroid_2d"]
-            # delta_c = obj_center - bbox_center
-            # dataset_dict["trans_ratio"] = torch.as_tensor([delta_c[0] / bw, delta_c[1] / bh, z_ratio]).to(torch.float32)
+
         return dataset_dict
 
     def smooth_xyz(self, xyz):

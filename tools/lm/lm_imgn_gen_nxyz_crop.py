@@ -6,17 +6,17 @@ import sys
 cur_dir = osp.dirname(osp.abspath(__file__))
 PROJ_ROOT = osp.normpath(osp.join(cur_dir, "../.."))
 sys.path.insert(0, PROJ_ROOT)
-
+import torch
 
 # import hashlib
 from lib.utils.mask_utils import mask2bbox_xyxy
 from lib.pysixd import misc
 from lib.vis_utils.image import grid_show
-from lib.meshrenderer.meshrenderer_phong_normals import Renderer
+# from lib.meshrenderer.meshrenderer_phong_normals import Renderer
 # import logging
-
+from verify_idea.render.diffrenderNormal import DiffRenderer_Normal_Wrapper
 import ref
-
+import cv2
 import mmcv
 import numpy as np
 from tqdm import tqdm
@@ -181,9 +181,6 @@ def get_emb_show(bbox_emb):
 
 class XyzGen(object):
     def __init__(self, split="train", scene="all"):
-        # self.name = data_cfg["name"]
-        # self.data_cfg = data_cfg
-
         self.objs = SPLITS_LM_IMGN_13["lm_imgn_13_train_1k_per_obj"]["objs"]  # selected objects
 
         # idx files with image ids
@@ -192,25 +189,9 @@ class XyzGen(object):
         self.nxyz_prefixes = SPLITS_LM_IMGN_13["lm_imgn_13_train_1k_per_obj"]["nxyz_prefixes"]
 
         # self.dataset_root = data_cfg["dataset_root"]  # lm_imgn
-        self.models_root = SPLITS_LM_IMGN_13["lm_imgn_13_train_1k_per_obj"]["models_root"]  # BOP_DATASETS/lm/models
-        # self.scale_to_meter = data_cfg["scale_to_meter"]  # 0.001===zhuyi
-
-        # True (load masks but may not use it)
-        # self.with_masks = data_cfg["with_masks"]
-        # True (load depth path here, but may not use it)
-        # self.with_depth = data_cfg["with_depth"]
-        # self.depth_factor = data_cfg["depth_factor"]  # 1000.0
-
+        self.models_root = SPLITS_LM_IMGN_13["lm_imgn_13_train_1k_per_obj"]["models_root"]  
         self.cam = SPLITS_LM_IMGN_13["lm_imgn_13_train_1k_per_obj"]["cam"]  #
-        # self.height = data_cfg["height"]  # 480
-        # self.width = data_cfg["width"]  # 640
-
-        # self.cache_dir = data_cfg["cache_dir"]  # .cache
-        # self.use_cache = data_cfg["use_cache"]  # True
-        # # sample uniformly to get n items
-        # self.n_per_obj = data_cfg.get("n_per_obj", 1000)
-        # self.filter_invalid = data_cfg["filter_invalid"]
-        # self.filter_scene = data_cfg.get("filter_scene", False)
+      
         ##################################################
         if self.cam is None:
             self.cam = np.array(
@@ -233,10 +214,13 @@ class XyzGen(object):
             #     model_paths, vertex_tmp_store_folder=osp.join(PROJ_ROOT, ".cache"), vertex_scale=0.001
             # )
             model_paths = [osp.join(self.models_root, f"obj_{_id:06d}.ply") for _id in ref.lm_full.id2obj]
-            self.renderer = Renderer(
-                model_paths, vertex_tmp_store_folder=osp.join(
-                    PROJ_ROOT, ".cache")
-            )
+            # self.renderer = Renderer(
+            #     model_paths, vertex_tmp_store_folder=osp.join(
+            #         PROJ_ROOT, ".cache")
+            # )
+            self.renderer=DiffRenderer_Normal_Wrapper(
+            model_paths,device="cuda"
+        )
         return self.renderer
 
     def main(self):
@@ -271,11 +255,19 @@ class XyzGen(object):
                 # render_obj_id = ref.lm_full.obj2id.index(obj_id)  # 0-based
                 render_obj_id=obj_id-1
 
-                # t=np.array([0,0,4])  #  #固定平移
-
-                bgr_gl, depth_gl, nomal_img = self.get_renderer().render(
-                    render_obj_id, IM_W, IM_H, self.cam, R, t, near, far)
-                # bgr_gl, depth_gl= self.get_renderer().render(render_obj_id, IM_W, IM_H, K, R, t, near, far)
+                T=np.eye(4)
+                T[:3,:3]=R
+                T[:3,3]=t
+                T=T[None]
+                T=torch.tensor(T,device='cuda:0',dtype=torch.float32)
+                K=torch.tensor(self.cam,device='cuda:0',dtype=torch.float32)
+                K=K[None]
+                # bgr_gl, depth_gl, nomal_img = self.get_renderer().render(
+                #     render_obj_id, IM_W, IM_H, self.cam, R, t, near, far)
+                nomal_img = self.get_renderer()(
+                    [render_obj_id], T,K,(IM_W, IM_H),near, far)
+                nomal_img=nomal_img.cpu().numpy()
+                nomal_img=nomal_img[0]
 
                 # mask = (depth_gl > 0).astype("uint8")
 
@@ -293,21 +285,23 @@ class XyzGen(object):
                     if VIS:
                         print(
                             f"xyz_crop min {nxyz_crop.min()} max {nxyz_crop.max()}")
-                        show_ims = [
-                            bgr_gl[:, :, [2, 1, 0]],
-                            # get_emb_show(xyz_np),
-                            get_emb_show(nomal_img),
-                            get_emb_show(nxyz_crop),
+                        cv2.imwrite("before.png",nomal_img*255)
+                        cv2.imwrite("after.png",nxyz_crop*255)
+                        # show_ims = [
+                        #     bgr_gl[:, :, [2, 1, 0]],
+                        #     # get_emb_show(xyz_np),
+                        #     get_emb_show(nomal_img),
+                        #     get_emb_show(nxyz_crop),
 
-                        ]
-                        show_titles = ["bgr_gl", "nxyz", "nxyz_crop"]
-                        grid_show(show_ims, show_titles, row=1, col=3)
+                        # ]
+                        # show_titles = ["bgr_gl", "nxyz", "nxyz_crop"]
+                        # grid_show(show_ims, show_titles, row=1, col=3)
                         break #跳过查看下一个类
                 if not args.no_save:  # save file
                     mmcv.mkdir_or_exist(osp.dirname(save_path))
                     mmcv.dump(nxyz_info, save_path)
-        if self.renderer is not None:
-            self.renderer.close()
+        # if self.renderer is not None:
+        #     self.renderer.close()
 
                   
 
