@@ -373,8 +373,6 @@ class GDRN(nn.Module):
                 pred_rot_, pred_t_ = self.pnp_net(
                     coor_feat, region=region_atten, extents=roi_extents, mask_attention=mask_atten
                 )
-        
-        
             # convert pred_rot to rot mat -------------------------
             rot_type = pnp_net_cfg.ROT_TYPE
             if rot_type in ["ego_quat", "allo_quat"]:
@@ -431,8 +429,34 @@ class GDRN(nn.Module):
             pred_ego_rot =torch.tensor(np.array([1,0,0,0,1,0,0,0,1]).reshape(3,3),device="cuda:0")  #随便赋一个值，以消除后续使用的错误
             pred_ego_rot=pred_ego_rot.view(1,3,3)
             pred_ego_rot=pred_ego_rot.repeat(24,1,1)
+
         if not do_loss:  # test
-            out_dict = {"rot": pred_ego_rot, "trans": pred_trans}
+             # use ransacpnp 
+            # coor_feat=coor_feat.transpose(1,0)#cbwh
+            # mask1=gt_mask_visib>0.5
+            # # coor_feat[:,mask1[:,:,:]]=0# qiankaobe
+            # # coor_feat=coor_feat.transpose(1,0)#bcwh
+            # region=region.transpose(1,0)
+            # # region[:,mask1[:,:,:]]=0
+            # # region=region.transpose(1,0)
+            # coor_feat[2,mask1[:,:,:]]+=1
+            # coor_2d=(coor_feat[:2,mask1[:,:,:]]/coor_feat[2,mask1[:,:,:]]*-1).detach().cpu().numpy().transpose(1,0)
+            # # coor_2d=(coor_feat[:2,mask1[:,:,:]]).detach().cpu().numpy().transpose(1,0)
+            # coor_3d=region[:,mask1[:,:,:]].detach().cpu().numpy().transpose(1,0)
+            # # coor_3d[:,2]+=1
+            # camera_matrix=np.array([[1,0,0],[0,1,0],[0,0,1]],dtype=np.float64)
+            # dist_coeffs = np.zeros((4, 1))  # Assuming no lens distortion
+            # _, R_vector, T_vector, inliers = cv2.solvePnPRansac(coor_3d, coor_2d,
+            #                                     camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_EPNP,tvec=np.zeros((3,1)))
+            # gl2cv=np.array([[1.0,0,0],[0,1.0,0],[0,0,1]],dtype=np.float32)
+            
+            # R_matrix = cv2.Rodrigues(R_vector, jacobian=0)[0]
+            # # R_matrix=np.matmul(R_matrix,gl2cv)
+            # R_matrix=np.matmul(gl2cv,R_matrix)
+
+            # R_matrix=torch.tensor([R_matrix],device='cuda:0')
+            #===========================
+            out_dict = {"rot": pred_ego_rot, "trans": pred_trans} #return real pose,为什么平移的结果受旋转的结果的影响呢
             if cfg.TEST.USE_PNP:
                 # TODO: move the pnp/ransac inside forward
                 out_dict.update({"mask": mask, "coor_x": coor_x, "coor_y": coor_y, "coor_z": coor_z, "region": region})
@@ -602,38 +626,6 @@ class GDRN(nn.Module):
                 loss_dict["loss_coor_x"] *= r_head_cfg.XYZ_LW
                 loss_dict["loss_coor_y"] *= r_head_cfg.XYZ_LW
                 loss_dict["loss_coor_z"] *= r_head_cfg.XYZ_LW
-        # rot nxyz loss--------------
-        # if not r_head_cfg.FREEZE:
-        #     nxyz_loss_type = r_head_cfg.XYZ_LOSS_TYPE
-        #     gt_mask_nxyz = gt_masks[r_head_cfg.XYZ_LOSS_MASK_GT]
-        #     if nxyz_loss_type == "L1":
-        #         loss_func = nn.L1Loss(reduction="sum")
-        #         loss_dict["loss_coor_x"] = loss_func(
-        #             out_x * gt_mask_nxyz[:, None], gt_nxyz[:, 0:1] * gt_mask_nxyz[:, None]
-        #         ) / gt_mask_nxyz.sum().float().clamp(min=1.0)
-        #         loss_dict["loss_coor_y"] = loss_func(
-        #             out_y * gt_mask_nxyz[:, None], gt_nxyz[:, 1:2] * gt_mask_nxyz[:, None]
-        #         ) / gt_mask_nxyz.sum().float().clamp(min=1.0)
-        #         loss_dict["loss_coor_z"] = loss_func(
-        #             out_z * gt_mask_nxyz[:, None], gt_nxyz[:, 2:3] * gt_mask_nxyz[:, None]
-        #         ) / gt_mask_nxyz.sum().float().clamp(min=1.0)
-        #     elif nxyz_loss_type == "CE_coor":
-        #         gt_nxyz_bin = gt_nxyz_bin.long()
-        #         loss_func = CrossEntropyHeatmapLoss(reduction="sum", weight=None)  # r_head_cfg.XYZ_BIN+1
-        #         loss_dict["loss_coor_x"] = loss_func(
-        #             out_x * gt_mask_nxyz[:, None], gt_nxyz_bin[:, 0] * gt_mask_nxyz.long()
-        #         ) / gt_mask_nxyz.sum().float().clamp(min=1.0)
-        #         loss_dict["loss_coor_y"] = loss_func(
-        #             out_y * gt_mask_nxyz[:, None], gt_nxyz_bin[:, 1] * gt_mask_nxyz.long()
-        #         ) / gt_mask_nxyz.sum().float().clamp(min=1.0)
-        #         loss_dict["loss_coor_z"] = loss_func(
-        #             out_z * gt_mask_nxyz[:, None], gt_nxyz_bin[:, 2] * gt_mask_nxyz.long()
-        #         ) / gt_mask_nxyz.sum().float().clamp(min=1.0)
-        #     else:
-        #         raise NotImplementedError(f"unknown xyz loss type: {nxyz_loss_type}")
-        #     loss_dict["loss_coor_nx"] *= r_head_cfg.XYZ_LW
-        #     loss_dict["loss_coor_ny"] *= r_head_cfg.XYZ_LW
-        #     loss_dict["loss_coor_nz"] *= r_head_cfg.XYZ_LW
 
         # mask loss ----------------------------------
         if not r_head_cfg.FREEZE:
@@ -666,43 +658,51 @@ class GDRN(nn.Module):
                 # else:
                 #     loss_dict["loss_region"]=loss_func(torch.tensor([0]),torch.tensor([1]))
             elif region_loss_type == "R_cos":
-                gl2cv=torch.tensor(np.array([[-1.0,0,0],[0,-1.0,0],[0,0,1]],dtype=np.float32),device="cuda:0")
-                gl2cv=gl2cv.repeat(gt_rot.shape[0],1,1)
-                # with torch.no_grad():
-                coor_feat1=torch.permute(coor_feat,(0,2,3,1))#==>bwhc
-                coor_feat1=coor_feat1[...,None]
-                gt_rot_t=torch.matmul(gl2cv,gt_rot)
-                gt_rot_t=torch.permute(gt_rot_t,(0,2,1))#qiankaobe
-                gt_rot_t=gt_rot_t.view(coor_feat1.shape[0],1,1,3,3)
-                coor_feat1=torch.matmul(gt_rot_t,coor_feat1)
-                coor_feat1=coor_feat1.squeeze()
-                coor_feat1= torch.permute(coor_feat1,(0,3,1,2))
-                # i=(roi_classes==7).nonzero().cpu().numpy()
-                # i =int(i[0]) if not len(i)==0 else 0 
-                # gt_xyz1=torch.permute(gt_xyz,(0,3,2,1))
-                # gt_xyz1=gt_xyz1[...,None]
-                # gt_xyz1=torch.matmul(gt_rot_t,gt_xyz1)
-                # gt_xyz1=gt_xyz1.squeeze()
-                # gt_xyz1= torch.permute(gt_xyz1,(0,3,1,2))
-                # cv2.imwrite("origin_change.png",(gt_xyz1[i].cpu().numpy().transpose(1,2,0)+1)*255/2)
-                # cv2.imwrite("img1.png",(coor_feat1[i].detach().cpu().numpy().transpose(1,2,0)+1)*255/2)
-                # cv2.imwrite("img2.png",(out_region[i].detach().cpu().numpy().transpose(1,2,0)+1)*255/2)
-                cos_simi=F.cosine_similarity(coor_feat1,out_region,dim=1)
-                valid_mask = gt_mask_xyz[:,:, :].float() \
-                         * (cos_simi.detach() < 0.999).float() \
-                         * (cos_simi.detach() > -0.999).float()
-                cos_simi=cos_simi[valid_mask>0.5]
-                ll=torch.acos(cos_simi)
-                loss_dict["R_loss_region"]=torch.mean(ll)
-                
-                # cos_simi=cos_simi.sum()/gt_mask_xyz.sum()#这样就比一大了
-                # # cos_simi=cos_simi.sum()/gt_mask_xyz.sum().float().clamp(min=1.0)#这样就比一大了
-                # if not -1<cos_simi<1:
-                #     print(cos_simi)
-                # cos_simi=cos_simi.arccos()
-                # loss_dict["R_loss_region"]=cos_simi
-
-                # pass
+                if r_head_cfg.REGION_ATTENTION:
+                    gl2cv=torch.tensor(np.array([[-1.0,0,0],[0,-1.0,0],[0,0,1]],dtype=np.float32),device="cuda:0")
+                    gl2cv=gl2cv.repeat(gt_rot.shape[0],1,1)
+                    # with torch.no_grad():
+                    out_region1=torch.permute(out_region,(0,2,3,1))#==>bwhc
+                    coor_feat1=out_region1[...,None]
+                    gt_rot_t=torch.matmul(gl2cv,gt_rot)
+                    # gt_rot_t=torch.permute(gt_rot_t,(0,2,1))#qiankaobe
+                    gt_rot_t=gt_rot_t.view(coor_feat1.shape[0],1,1,3,3)
+                    coor_feat2=torch.matmul(gt_rot_t,coor_feat1)
+                    coor_feat2=coor_feat2.squeeze()
+                    # coor_feat2= torch.permute(coor_feat2,(0,3,1,2))#out_region in camare in real rot
+                    # i=(roi_classes==7).nonzero().cpu().numpy()
+                    # i =int(i[0]) if not len(i)==0 else 0 
+                    # gt_xyz1=torch.permute(gt_xyz,(0,3,2,1))
+                    # gt_xyz1=gt_xyz1[...,None]
+                    # gt_xyz1=torch.matmul(gt_rot_t,gt_xyz1)
+                    # gt_xyz1=gt_xyz1.squeeze()
+                    # gt_xyz1= torch.permute(gt_xyz1,(0,3,1,2))
+                    # cv2.imwrite("origin_change.png",(gt_xyz1[i].cpu().numpy().transpose(1,2,0)+1)*255/2)
+                    # cv2.imwrite("img1.png",(coor_feat[i].detach().cpu().numpy().transpose(1,2,0)+1)*255/2)
+                    # cv2.imwrite("img2.png",(out_region[i].detach().cpu().numpy().transpose(1,2,0)+1)*255/2)
+                    # cos_simi=F.cosine_similarity(coor_feat1,out_region,dim=1)
+                    # valid_mask = gt_mask_xyz[:,:, :].float() \
+                    #          * (cos_simi.detach() < 0.999).float() \
+                    #          * (cos_simi.detach() > -0.999).float()
+                    # cos_simi=cos_simi[valid_mask>0.5]
+                    # ll=torch.acos(cos_simi)
+                    coor_feat2=coor_feat2[gt_mask_xyz>0.5]
+                    # coor_feat2=coor_feat2[:,:2]/(coor_feat2[:,2:]+1)
+                    coor_feat2=coor_feat2[:,:2]
+                    coor_2d=coor_feat.permute((0,2,3,1))
+                    coor_2d=coor_2d[gt_mask_xyz>0.5]
+                    # coor_2d=coor_2d[...,:2]/(coor_2d[...,2:]+1)
+                    coor_2d=coor_2d[...,:2]
+                    # coor_2d1=coor_2d[gt_mask_xyz>0.5]
+                    ll=nn.MSELoss(reduction="mean")(coor_2d,coor_feat2)
+                    loss_dict["R_loss_region"]=torch.mean(ll)
+                    
+                    # cos_simi=cos_simi.sum()/gt_mask_xyz.sum()#这样就比一大了
+                    # # cos_simi=cos_simi.sum()/gt_mask_xyz.sum().float().clamp(min=1.0)#这样就比一大了
+                    # if not -1<cos_simi<1:
+                    #     print(cos_simi)
+                    # cos_simi=cos_simi.arccos()
+                    # loss_dict["R_loss_region"]=cos_simi
             else:
                 raise NotImplementedError(f"unknown region loss type: {region_loss_type}")
                 
@@ -760,7 +760,8 @@ class GDRN(nn.Module):
                         
 
                 #============================================================================
-                elif pnp_net_cfg.PM_LOSS_TYPE=="R_normal_loss":
+                elif pnp_net_cfg.PM_LOSS_TYPE=="R_normal_loss" and False:
+                    #use cosimi
                     coor_feat = torch.cat([out_x, out_y, out_z], dim=1)#这里后面要改
                     gt_mask_xyz = gt_masks[r_head_cfg.XYZ_LOSS_MASK_GT]#visib
                     coor_feat1=torch.permute(coor_feat,(0,2,3,1))
@@ -770,23 +771,25 @@ class GDRN(nn.Module):
                     coor_feat1=torch.matmul(gt_rot_t,coor_feat1)
                     coor_feat1=coor_feat1.squeeze()
                     coor_feat1= torch.permute(coor_feat1,(0,3,1,2))
-                    # i=(roi_classes==3).nonzero().cpu().numpy()
-                    # i =int(i[0]) if not len(i)==0 else 0 
-                    # gt_xyz1=torch.permute(gt_xyz,(0,2,3,1))
-                    # gt_xyz1=gt_xyz1[...,None]
-                    # gt_xyz1=torch.matmul(gt_rot_t,gt_xyz1)
-                    # gt_xyz1=gt_xyz1.squeeze()
-                    # gt_xyz1= torch.permute(gt_xyz1,(0,3,1,2))
-                    # cv2.imwrite("origin_change.png",gt_xyz1[0].cpu().numpy().transpose(1,2,0)*255)
-                    # cv2.imwrite("img1.png",(coor_feat1[i].detach().cpu().numpy().transpose(1,2,0)+1)*255/2)
-                    # cv2.imwrite("img2.png",(out_region[i].detach().cpu().numpy().transpose(1,2,0)+1)*255/2)
-                    # coor_feat1.dequantize()
                     cos_simi=F.cosine_similarity(coor_feat1,out_region,dim=1)
 
                     cos_simi=cos_simi.sum()/gt_mask_xyz.sum()#这样就比一大了
                     # cos_simi=cos_simi.sum()/gt_mask_xyz.sum().float().clamp(min=1.0)#这样就比一大了
                     cos_simi=cos_simi.arccos()
                     loss_dict["R_normal_region"]=cos_simi
+                elif pnp_net_cfg.PM_LOSS_TYPE=="R_normal_pnp":
+                    gt_rot_t=torch.permute(out_rot,(0,1,2))
+                    gt_rot_t=torch.matmul(gl2cv,gt_rot_t)
+                    gt_rot_t=gt_rot_t.view(coor_feat1.shape[0],1,1,3,3)
+                    coor_feat2=torch.matmul(gt_rot_t,coor_feat1)
+                    coor_feat2=coor_feat2.squeeze()
+                    coor_feat2=coor_feat2[gt_mask_xyz>0.5]
+                    # coor_feat2=coor_feat2[:,:2]/(coor_feat2[:,2:]+1)
+                    coor_feat2=coor_feat2[:,:2]
+                    ll1=nn.MSELoss(reduction="mean")(coor_2d,coor_feat2)
+                    loss_dict["R_normal_pnp"]=torch.mean(ll1)
+
+                    
                 else:
                     assert (gt_points is not None) and (gt_trans is not None) and (gt_rot is not None)
                     loss_func = PyPMLoss(#看这里的误差计算,融合预测旋转和平移是还包括了平移在3d点上的 误差评估？

@@ -86,7 +86,8 @@ class ConvPnPNet(nn.Module):
             self.features.append(get_norm(norm, featdim1[i], num_gn_groups=num_gn_groups))
             self.features.append(nn.ReLU(inplace=True))
         for i in range(num_layers - 3):  # when num_layers > 3
-            self.features.append(nn.Conv2d(featdim1[2], featdim, kernel_size=3, stride=1, padding=1, bias=False))
+            feet_in=featdim1[2] if i==0 else featdim
+            self.features.append(nn.Conv2d(feet_in, featdim, kernel_size=3, stride=1, padding=1, bias=False))
             self.features.append(get_norm(norm, featdim, num_gn_groups=num_gn_groups))
             self.features.append(nn.ReLU(inplace=True))
 

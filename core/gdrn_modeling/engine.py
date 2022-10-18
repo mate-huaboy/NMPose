@@ -348,10 +348,11 @@ class GDRN_Lite(LightningLite):
                                 out_mask_vis = out_mask[vis_i, 0].cpu().numpy()
                                 tbx_writer.add_image("out_mask", out_mask_vis, iteration,dataformats='HW')
                                  #vis rigion
-                                out_rigion=out_dict["region"].detach()
-                                out_rigion=out_rigion[vis_i].cpu().numpy().transpose(1,2,0)
-                                out_rigion=get_emb_show(out_rigion)
-                                tbx_writer.add_image("region",out_rigion,iteration,dataformats="HWC")
+                                if cfg.MODEL.CDPN.ROT_HEAD.REGION_ATTENTION:
+                                    out_rigion=out_dict["region"].detach()
+                                    out_rigion=out_rigion[vis_i].cpu().numpy().transpose(1,2,0)
+                                    out_rigion=get_emb_show(out_rigion)
+                                    tbx_writer.add_image("region",out_rigion,iteration,dataformats="HWC")
                             gt_mask_vis = batch["roi_mask_visib"][vis_i].detach().cpu().numpy()
                             tbx_writer.add_image("gt_mask", gt_mask_vis, iteration,dataformats='HW')
 
