@@ -348,7 +348,7 @@ class GDRN_Lite(LightningLite):
                                 out_mask_vis = out_mask[vis_i, 0].cpu().numpy()
                                 tbx_writer.add_image("out_mask", out_mask_vis, iteration,dataformats='HW')
                                  #vis rigion
-                                if cfg.MODEL.CDPN.ROT_HEAD.REGION_ATTENTION:
+                                if cfg.MODEL.CDPN.ROT_HEAD.REGION_ATTENTION and False:
                                     out_rigion=out_dict["region"].detach()
                                     out_rigion=out_rigion[vis_i].cpu().numpy().transpose(1,2,0)
                                     out_rigion=get_emb_show(out_rigion)

@@ -122,7 +122,7 @@ class DiffRenderer_Normal_Wrapper(nn.Module):
         F_l=[]
         v_n_l=[]
         v_n_l2=[]
-        R=T[...,:3,:3]
+        # R=T[...,:3,:3]
         for b, _ in enumerate(model_names):
             # model_idx = self.cls2idx[model_names[b]]
             # model_idx=uniq[b]
@@ -137,7 +137,8 @@ class DiffRenderer_Normal_Wrapper(nn.Module):
             V_l.append(m.verts_list()[0])
             F_l.append( m.faces_list()[0])
             v_n=m.verts_normals_list()[0]
-            v_n1=R[b].view(1,3,3)@v_n[...,None]  #这里的T是不是要转到pytorch3d的坐标系下呢？
+            # v_n1=R[b].view(1,3,3)@v_n[...,None]  #这里的T是不是要转到pytorch3d的坐标系下呢？
+            v_n1=v_n
             v_n_l.append( v_n1.squeeze_())
 
 

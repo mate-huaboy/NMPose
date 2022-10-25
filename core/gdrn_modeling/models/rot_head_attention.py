@@ -127,16 +127,25 @@ class RotWithRegionHead(nn.Module):
         self.region_output_dim = num_regions + 1  # add one channel for bg
         if region_class_aware:
             self.region_output_dim *= num_classes
-
-        self.features.append(
-            nn.Conv2d(
+        self.out= nn.Conv2d(
                 num_filters,
                 self.mask_output_dim + self.rot_output_dim + self.region_output_dim,
                 kernel_size=output_kernel_size,
                 padding=pad,
                 bias=True,
             )
-        )
+        
+        self.scale_branch = nn.Linear(256, 3)#原本是2
+
+        # self.features.append(
+        #     nn.Conv2d(
+        #         num_filters,
+        #         self.mask_output_dim + self.rot_output_dim + self.region_output_dim,
+        #         kernel_size=output_kernel_size,
+        #         padding=pad,
+        #         bias=True,
+        #     )
+        # )
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -145,6 +154,8 @@ class RotWithRegionHead(nn.Module):
                 constant_init(m, 1)
             elif isinstance(m, nn.ConvTranspose2d):
                 normal_init(m, std=0.001)
+            elif isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, mean=0, std=0.001)
 
     def forward(self, x, x_f64=None, x_f32=None, x_f16=None):
         if self.concat:
@@ -174,25 +185,33 @@ class RotWithRegionHead(nn.Module):
                 with torch.no_grad():
                     for i, l in enumerate(self.features):
                         x = l(x)
+                    #加上注意力机智bcwh
+                    #flatten start with 2 end with -1
+                    scale = self.scale_branch(x.flatten(2).mean(dim=-1)).exp()#bc2
+                    x=self.out(x)
                     mask = x[:, : self.mask_output_dim, :, :]
                     xyz = x[:, self.mask_output_dim : self.mask_output_dim + self.rot_output_dim, :, :]
                     
                     region = x[:, self.mask_output_dim + self.rot_output_dim :, :, :]
+                    region,w3d=region.split([3,3],dim=1)
                     bs, c, h, w = xyz.shape
                     xyz = xyz.view(bs, 3, self.rot_output_dim // 3, h, w)
                     coor_x = xyz[:, 0, :, :, :]
                     coor_y = xyz[:, 1, :, :, :]
                     coor_z = xyz[:, 2, :, :, :]
-                    return (mask.detach(), coor_x.detach(), coor_y.detach(), coor_z.detach(), region.detach())
+                    return (mask.detach(), coor_x.detach(), coor_y.detach(), coor_z.detach(), region.detach(),w3d.detach(),scale.datech())
             else:
                 for i, l in enumerate(self.features):
                     x = l(x)
+                scale = self.scale_branch(x.flatten(2).mean(dim=-1)).exp()#b31
+                x=self.out(x)
                 mask = x[:, : self.mask_output_dim, :, :]
                 xyz = x[:, self.mask_output_dim : self.mask_output_dim + self.rot_output_dim, :, :]
                 region = x[:, self.mask_output_dim + self.rot_output_dim :, :, :]
+                region,w3d=region.split([3,3],dim=1)
                 bs, c, h, w = xyz.shape
                 xyz = xyz.view(bs, 3, self.rot_output_dim // 3, h, w)
                 coor_x = xyz[:, 0, :, :, :]
                 coor_y = xyz[:, 1, :, :, :]
                 coor_z = xyz[:, 2, :, :, :]
-                return mask, coor_x, coor_y, coor_z, region
+                return mask, coor_x, coor_y, coor_z, region,w3d,scale

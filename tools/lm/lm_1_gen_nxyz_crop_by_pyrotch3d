@@ -65,7 +65,7 @@ texture_paths = None
 
 scenes = [i for i in range(1, 15 + 1)]   #场景
 # xyz_root = osp.normpath(osp.join(PROJ_ROOT, "datasets/BOP_DATASETS/lm/train_pbr/xyz_crop"))
-xyz_root = osp.normpath(osp.join(PROJ_ROOT, "datasets/BOP_DATASETS/lm/test/nxyz_crop"))
+xyz_root = osp.normpath(osp.join(PROJ_ROOT, "datasets/BOP_DATASETS/lm/test/nxyz_crop_obj_3d"))
 
 
 
@@ -175,9 +175,9 @@ class XyzGen(object):
                          }
 
                          if VIS:
-                            nxyz_org=mmcv.load(save_path)
-                            nxyz_crop_org=nxyz_org["nxyz_crop"]
-                            cv2.imwrite("nxyz_crop_org.png",nxyz_crop_org*255)
+                            # nxyz_org=mmcv.load(save_path)
+                            # nxyz_crop_org=nxyz_org["nxyz_crop"]
+                            # cv2.imwrite("nxyz_crop_org.png",nxyz_crop_org*255)
                             # cv2.imwrite("bgr.png",bgr_gl*255)
                             cv2.imwrite("before.png",nomal_img*255)
                             cv2.imwrite("after.png",nxyz_crop*255)

@@ -229,6 +229,8 @@ class XyzGen(object):
             # scene_root='/home/lyn/Desktop/GDR-Net-main/datasets/lm_imgn/imgn'
             # xyz_root='/home/lyn/Desktop/GDR-Net-main/datasets/lm_imgn/xyz_crop_imgn/'
             # linemod each scene is an object
+            xyz_root=xyz_root.replace("nxyz_crop_imgn","nxyz_crop_imgn_obj_3d")
+
             with open(ann_file, "r") as f_ann:
                 indices = [line.strip("\r\n").split()[-1]
                            for line in f_ann.readlines()]  # string ids
