@@ -59,7 +59,7 @@ class ConvPnPNet(nn.Module):
             spatial_topk: 1
         """
         super().__init__()
-        nIn=nIn-3
+        nIn=nIn
         self.featdim = featdim
         self.num_regions = num_regions
         self.mask_attention_type = mask_attention_type

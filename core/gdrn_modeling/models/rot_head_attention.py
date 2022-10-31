@@ -135,7 +135,7 @@ class RotWithRegionHead(nn.Module):
                 bias=True,
             )
         
-        self.scale_branch = nn.Linear(256, 3)#原本是2
+        self.scale_branch = nn.Linear(256, 1)#原本是2
 
         # self.features.append(
         #     nn.Conv2d(
@@ -193,7 +193,7 @@ class RotWithRegionHead(nn.Module):
                     xyz = x[:, self.mask_output_dim : self.mask_output_dim + self.rot_output_dim, :, :]
                     
                     region = x[:, self.mask_output_dim + self.rot_output_dim :, :, :]
-                    region,w3d=region.split([3,3],dim=1)
+                    region,w3d=region.split([3,1],dim=1)
                     bs, c, h, w = xyz.shape
                     xyz = xyz.view(bs, 3, self.rot_output_dim // 3, h, w)
                     coor_x = xyz[:, 0, :, :, :]
@@ -208,7 +208,9 @@ class RotWithRegionHead(nn.Module):
                 mask = x[:, : self.mask_output_dim, :, :]
                 xyz = x[:, self.mask_output_dim : self.mask_output_dim + self.rot_output_dim, :, :]
                 region = x[:, self.mask_output_dim + self.rot_output_dim :, :, :]
-                region,w3d=region.split([3,3],dim=1)
+                # region,w3d=region.split([3,1],dim=1)
+                w3d=region[:,-1,:,:]
+                region=region[:,:3,:,:]
                 bs, c, h, w = xyz.shape
                 xyz = xyz.view(bs, 3, self.rot_output_dim // 3, h, w)
                 coor_x = xyz[:, 0, :, :, :]

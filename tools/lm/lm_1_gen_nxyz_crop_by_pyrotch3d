@@ -159,7 +159,7 @@ class XyzGen(object):
                     T=torch.tensor(T,device='cuda:0',dtype=torch.float32)
                     K=torch.tensor(K,device='cuda:0',dtype=torch.float32)
                     # T=T[:,:3,:3]
-                    nomal_img = self.get_renderer()([render_obj_id],T,K,(IM_W,IM_H),near,far)#如果固定t则如何呢
+                    nomal_img = self.get_renderer()([render_obj_id],T,K,(IM_W,IM_H),near,8)#如果固定t则如何呢
                     nomal_img=nomal_img.cpu().numpy()
                     nomal_img=nomal_img[0]
                     mask1=(nomal_img!=np.array([0,0,0])).astype("uint8")

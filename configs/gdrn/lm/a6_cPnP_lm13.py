@@ -1,5 +1,5 @@
 _base_ = ["config_base.py"]
-OUTPUT_DIR = "output27/gdrn/lm/a6_cPnP_lm13"#改变一下输出路径以同时跑两个
+OUTPUT_DIR = "output30/gdrn/lm/a6_cPnP_lm13"#改变一下输出路径以同时跑两个
 INPUT = dict(
   DZI_SCALE_RATIO=0.15,
  DZI_SHIFT_RATIO=0.1,
@@ -22,7 +22,7 @@ MODEL = dict(
             FREEZE=False,  #同时不训练
             XYZ_LOSS_TYPE='Cos_smi',
             REGION_ATTENTION=True,
-            NUM_REGIONS=5,
+            NUM_REGIONS=3,
             REGION_LOSS_TYPE='R_cos',#"CE"
         ),
         PNP_NET=dict(     

@@ -170,12 +170,19 @@ class GDRN(nn.Module):
 
             mask, coor_x, coor_y, coor_z, region,w3d,scale = self.rot_head_net(features)
             coor_feat = torch.cat([coor_x, coor_y, coor_z], dim=1)  # BCHW
+            w3d=torch.abs(w3d)
+            ma=gt_mask_visib<0.5
+            w3d.masked_fill_(ma,-1e7)
+
+            # for i in range(ma.shape[0]):
+            #     w3d[i:i+1,ma[i]]=w3d[i:i+1,ma[i]].softmax(1) 
+            w3d=w3d[:,None]
             #将w3d化为想要的样子
             w3d=w3d.reshape(w3d.shape[0],w3d.shape[1],-1)
             w3d=w3d.softmax(2)
+            w3d=w3d*torch.sum(ma,dim=[1,2]).view([24,1,1])
             scale=scale[...,None]
             # w3d=w3d*scale
-            w3d=w3d
             w3d=w3d.reshape(w3d.shape[0],w3d.shape[1],region.shape[2],region.shape[3])
             #归一化
             coor_feat=F.normalize(coor_feat,p=2,dim=1)
@@ -201,9 +208,6 @@ class GDRN(nn.Module):
             yy1=(coor_feat[:,0]*mask[:,0])[:,None]
             yy2=(coor_feat[:,1]*mask[:,0])[:,None]
             yy3=(coor_feat[:,2]*mask[:,0])[:,None]
-            # yy1=(coor_feat[:,0]*gt_mask_visib[:,None][:,0])[:,None]
-            # yy2=(coor_feat[:,1]*gt_mask_visib[:,None][:,0])[:,None]
-            # yy3=(coor_feat[:,2]*gt_mask_visib[:,None][:,0])[:,None]
             coor_feat = torch.cat([yy1, yy2, yy3], dim=1)
          #first eti translate
         device = x.device
@@ -335,7 +339,7 @@ class GDRN(nn.Module):
         if pnp_net_cfg.MASK_ATTENTION != "none":
             mask_atten = get_mask_prob(cfg, mask)
 
-        region_atten = region
+        region_atten =torch.cat([region,w3d],dim=1)
         # if pnp_net_cfg.REGION_ATTENTION:
         #     region_atten = region_softmax
 
@@ -469,7 +473,7 @@ class GDRN(nn.Module):
             out_dict = {"rot": pred_ego_rot, "trans": pred_trans} #return real pose,为什么平移的结果受旋转的结果的影响呢
             if cfg.TEST.USE_PNP:
                 # TODO: move the pnp/ransac inside forward
-                out_dict.update({"mask": mask, "coor_x": coor_x, "coor_y": coor_y, "coor_z": coor_z, "region": region})
+                out_dict.update({"mask": mask, "coor_x": coor_x, "coor_y": coor_y, "coor_z": coor_z, "region": region,"w3d":w3d})
         else:
             out_dict = {}
             assert (
@@ -478,7 +482,7 @@ class GDRN(nn.Module):
                 and (gt_trans_ratio is not None)
                 # and (gt_region is not None)
             )
-            out_dict={"mask":mask, "coor_x":coor_x, "coor_y":coor_y, "coor_z":coor_z,"region": region,}
+            out_dict={"mask":mask, "coor_x":coor_x, "coor_y":coor_y, "coor_z":coor_z,"region": region,"w3d":w3d}
             
 
             mean_re, mean_te = compute_mean_re_te_sym(pred_trans, pred_ego_rot, gt_trans, gt_ego_rot,sym_infos)
@@ -633,7 +637,7 @@ class GDRN(nn.Module):
                 loss_dict["loss_coor_z"] *= r_head_cfg.XYZ_LW
 
         # mask loss ----------------------------------
-        if not r_head_cfg.FREEZE and False:
+        if not r_head_cfg.FREEZE:
             mask_loss_type = r_head_cfg.MASK_LOSS_TYPE
             gt_mask = gt_masks[r_head_cfg.MASK_LOSS_GT]
             if mask_loss_type == "L1":
@@ -684,7 +688,7 @@ class GDRN(nn.Module):
                     # cv2.imwrite("origin_change.png",(gt_xyz1[i].cpu().numpy().transpose(1,2,0)+1)*255/2)
                     # cv2.imwrite("img1.png",(coor_feat[i].detach().cpu().numpy().transpose(1,2,0)+1)*255/2)
                     # cv2.imwrite("img2.png",(out_region[i].detach().cpu().numpy().transpose(1,2,0)+1)*255/2)
-                    cos_simi=F.cosine_similarity(coor_feat,coor_feat2,dim=1)
+                    cos_simi=F.cosine_similarity(gt_xyz,coor_feat2,dim=1)
                     valid_mask = gt_mask_xyz[:,:, :].float() \
                              * (cos_simi.detach() < 0.999).float() \
                              * (cos_simi.detach() > -0.999).float()
@@ -762,50 +766,64 @@ class GDRN(nn.Module):
                         loss_normal_dict= self.rot_normalLoss.get_rot_normal_loss(out_rot,gt_rot,roi_classes,None,roi_cams)
                         loss_dict.update(loss_normal_dict)#向字典中加入字典
                         
-
+                #w的权重loss
                 #============================================================================
                 elif pnp_net_cfg.PM_LOSS_TYPE=="Rot_cos_loss":
                     #use cosimi
-                    out_rot=torch.permute(out_rot,(0,1,2))
-                    out_rot_3d=torch.matmul(gl2cv,out_rot)
-                    out_rot_3d=out_rot_3d.view(coor_feat1.shape[0],1,1,3,3)#这里coor1为out region
-                    coor_feat2=torch.matmul(out_rot_3d,coor_feat1)#bwhc1
-                    coor_feat2=coor_feat2.squeeze()
-                    coor_feat2= torch.permute(coor_feat2,(0,3,1,2))#bcwh
-                    cos_simi_pre=torch.cosine_similarity(coor_feat,coor_feat2,dim=1)
-                    valid_mask_pre = gt_mask_xyz[:, :, :].float() \
-                         * (cos_simi_pre.detach() < 0.999).float() \
-                         * (cos_simi_pre.detach() > -0.999).float()
-                    cos_ll_pre=cos_simi_pre[valid_mask_pre>0.5]
-                    coor_feat_gt=torch.matmul(gt_rot_t,coor_feat1)
-                    coor_feat_gt=coor_feat_gt.squeeze()
-                    coor_feat_gt=torch.permute(coor_feat_gt,(0,3,1,2))
-                    cos_simi_gt=torch.cosine_similarity(coor_feat,coor_feat_gt,dim=1)
-                    valid_mask_gt = gt_mask_xyz[:, :, :].float() \
-                         * (cos_simi_gt.detach() < 0.999).float() \
-                         * (cos_simi_gt.detach() > -0.999).float()
-                    cos_ll_gt=cos_simi_gt[valid_mask_gt>0.5]
-                    cos_ll_pre=torch.acos(cos_ll_pre)
-                    cos_ll_gt=torch.acos(cos_ll_gt)
-                    
-
-                    #乘上权重
-                    # coor_feat2=w3d*coor_feat2
-                    # coor_feat2=coor_feat2
-                    # coor_feat2=coor_feat2[...,None]
-                    # coor_feat2= torch.permute(coor_feat2,(0,2,3,4,1))#bwh1c
-                    # coor_feat3=coor_feat[...,None]
-                    # coor_feat3=torch.permute(coor_feat3,(0,2,3,1,4))#bwhc1
-                    # coor_feat4=torch.matmul(coor_feat2,coor_feat3).squeeze()
-                    # coor_feat4=coor_feat4[valid_mask>0.5]
-                    # coor_feat2=coor_feat2[-1<coor_feat2]
-                    # coor_feat2=coor_feat2[coor_feat2<1]
-                    
-                    # cos_ll=torch.acos(coor_feat4)#这里好像可以不在范围内吧,根本不下降，是一个常数
-                    loss_dict["Rot_loss"]=torch.mean(cos_ll_pre)/torch.mean(cos_ll_gt)
                     with torch.no_grad():
-                        if not -3.14<loss_dict["Rot_loss"].detach().cpu().numpy()<3.14:
-                            print(loss_dict["Rot_loss"].detach().cpu().numpy())
+                        out_rot=torch.permute(out_rot,(0,1,2))
+                        out_rot_3d=torch.matmul(gl2cv,out_rot)
+                        out_rot_3d=out_rot_3d.view(coor_feat1.shape[0],1,1,3,3)#这里coor1为out region
+                        out_region_3d=torch.matmul(out_rot_3d,coor_feat1)#bwhc1
+                        out_region_3d=out_region_3d.squeeze()
+                        out_region_3d= torch.permute(out_region_3d,(0,3,1,2))#bcwh
+                        cos_simi_pre=torch.cosine_similarity(coor_feat,out_region_3d,dim=1)
+                        
+                        coor_feat_gt=torch.matmul(gt_rot_t,coor_feat1)
+                        coor_feat_gt=coor_feat_gt.squeeze()
+                        coor_feat_gt=torch.permute(coor_feat_gt,(0,3,1,2))
+                        cos_simi_gt=torch.cosine_similarity(coor_feat,coor_feat_gt,dim=1)
+                        valid_mask_gt = gt_mask_xyz[:, :, :].float() \
+                            * (cos_simi_gt.detach() < 0.999).float() \
+                            * (cos_simi_gt.detach() > -0.999).float()\
+                            * (cos_simi_pre.detach() < 0.999).float() \
+                            * (cos_simi_pre.detach() > -0.999).float()
+                        cos_ll_gt=cos_simi_gt[valid_mask_gt>0.5]
+                        cos_ll_pre=cos_simi_pre[valid_mask_gt>0.5]
+                        cos_ll_pre=torch.acos(cos_ll_pre)
+                        cos_ll_gt=torch.acos(cos_ll_gt)
+                    w3d_select=w3d[:,0]
+                    w3d_select=w3d_select[valid_mask_gt>0.5]
+                    ll=w3d_select*(cos_ll_gt+cos_ll_pre)
+                    ll=ll.mean()
+                   
+                    loss_dict["Rot_loss"]=ll
+                    #旋转误差===============
+                    assert (gt_points is not None) and (gt_trans is not None) and (gt_rot is not None)
+                    loss_func = PyPMLoss(#看这里的误差计算,融合预测旋转和平移是还包括了平移在3d点上的 误差评估？
+                        loss_type="L1",
+                        beta=pnp_net_cfg.PM_SMOOTH_L1_BETA,
+                        reduction="mean",
+                        loss_weight=pnp_net_cfg.PM_LW,
+                        norm_by_extent=pnp_net_cfg.PM_NORM_BY_EXTENT,
+                        symmetric=pnp_net_cfg.PM_LOSS_SYM,
+                        disentangle_t=pnp_net_cfg.PM_DISENTANGLE_T,
+                        disentangle_z=pnp_net_cfg.PM_DISENTANGLE_Z,
+                        t_loss_use_points=pnp_net_cfg.PM_T_USE_POINTS,
+                        r_only=pnp_net_cfg.PM_R_ONLY,
+                    )
+                    loss_pm_dict = loss_func(
+                        pred_rots=out_rot,
+                        gt_rots=gt_rot,
+                        points=gt_points,
+                        pred_transes=out_trans,
+                        gt_transes=gt_trans,
+                        extents=extents,
+                        sym_infos=sym_infos,
+                    )
+                    loss_dict.update(loss_pm_dict)#向字典中加入字典
+                    #===================
+                   
                 elif pnp_net_cfg.PM_LOSS_TYPE=="R_normal_pnp":
                     gt_rot_t=torch.permute(out_rot,(0,1,2))
                     gt_rot_t=torch.matmul(gl2cv,gt_rot_t)
@@ -1065,7 +1083,7 @@ def build_model_optimizer(cfg):
         # -----------------------------------------------
         if pnp_net_cfg.ENABLE:
             if r_head_cfg.XYZ_LOSS_TYPE in ["CE_coor", "CE"]:
-                pnp_net_in_channel = r_out_dim - 3
+                pnp_net_in_channel = r_out_dim
             else:
                 pnp_net_in_channel = r_out_dim
 

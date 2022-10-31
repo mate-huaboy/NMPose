@@ -16,7 +16,9 @@ sys.path.insert(0, PROJ_ROOT)
 from lib.utils.mask_utils import mask2bbox_xyxy
 from lib.pysixd import misc
 from lib.vis_utils.image import grid_show
-from lib.meshrenderer.meshrenderer_phong_normals import Renderer
+# from lib.meshrenderer.meshrenderer_phong_normals import Renderer
+from verify_idea.render.diffrenderNormal import DiffRenderer_Normal_Wrapper
+import torch
 import ref
 
 DATASETS_ROOT = osp.normpath(osp.join(PROJ_ROOT, "datasets"))
@@ -97,6 +99,7 @@ SPLITS_LM_PBR = dict(
 #             )
 
 # lmo single objs
+#  ref.lmo_full.objects定义了lmo数据集中的类，指出了需要渲染的类别
 for obj in ref.lmo_full.objects:
     for split in ["train"]:
         name = "lmo_pbr_{}_{}".format(obj, split)
@@ -215,10 +218,13 @@ class XyzGen(object):
             # self.renderer = Renderer(
             #     model_paths, vertex_tmp_store_folder=osp.join(PROJ_ROOT, ".cache"), vertex_scale=0.001
             # )
-            model_paths = [osp.join(self.models_root, f"obj_{_id:06d}.ply") for _id in ref.lm_full.id2obj]
-            self.renderer = Renderer(
-                model_paths, vertex_tmp_store_folder=osp.join(
-                    PROJ_ROOT, ".cache")
+            model_paths = [osp.join(self.models_root, f"obj_{_id:06d}.ply") for _id in self.cat_ids]
+            # self.renderer = Renderer(
+            #     model_paths, vertex_tmp_store_folder=osp.join(
+            #         PROJ_ROOT, ".cache")
+            # )
+            self.renderer=DiffRenderer_Normal_Wrapper(
+                    model_paths,device="cuda"
             )
         return self.renderer
 
@@ -233,6 +239,7 @@ class XyzGen(object):
             cam_dict = mmcv.load(osp.join(scene_root, "scene_camera.json"))
 
             for str_im_id in tqdm(gt_dict, postfix=f"{scene_id}"):
+                # str_im_id='58'
                 int_im_id = int(str_im_id)
 
                 scene_im_id = f"{scene_id}/{int_im_id}"
@@ -244,17 +251,26 @@ class XyzGen(object):
                     obj_id = anno["obj_id"]
                     if obj_id not in self.cat_ids:
                         continue
+                    id=self.cat_ids.index(obj_id)
                     R = np.array(anno["cam_R_m2c"], dtype="float32").reshape(3, 3)
                     t = np.array(anno["cam_t_m2c"], dtype="float32") / 1000.0
 
                     xyz_path = osp.join(self.xyz_root, f"{scene_id:06d}/{int_im_id:06d}_{anno_i:06d}-xyz.pkl")
                     nxyz_path = osp.join(self.nxyz_root, f"{scene_id:06d}/{int_im_id:06d}_{anno_i:06d}-nxyz.pkl")
-                    render_obj_id=obj_id-1
+                    render_obj_id=id
 
                 # t=np.array([0,0,4])  #  #固定平移
-
-                    bgr_gl, depth_gl, nomal_img = self.get_renderer().render(
-                        render_obj_id, self.width, self.height, K, R, t, near, far)
+                    T=np.eye(4)
+                    T[:3,:3]=R
+                    T[:3,3]=t
+                    T=T[None]
+                    
+                    T=torch.tensor(T,device='cuda:0',dtype=torch.float32)
+                    K=torch.tensor(K,device='cuda:0',dtype=torch.float32)
+                    K=K.view(1,3,3)
+                    nomal_img = self.get_renderer()([render_obj_id],T,K,(self.width,self.height),near,far)#如果固定t则如何呢
+                    nomal_img=nomal_img.cpu().numpy()
+                    nomal_img=nomal_img[0]
                     mask1 = (nomal_img != np.array([0, 0, 0])).astype("uint8")
 
                     if mask1.sum() == 0:
@@ -269,16 +285,20 @@ class XyzGen(object):
                         if VIS:
                             print(
                                 f"xyz_crop min {nxyz_crop.min()} max {nxyz_crop.max()}")
-                            show_ims = [
-                                bgr_gl[:, :, [2, 1, 0]],
-                                # get_emb_show(xyz_np),
-                                get_emb_show(nomal_img),
-                                get_emb_show(nxyz_crop),
+                            import cv2
+                            cv2.imwrite("nxyz_crop.png",nxyz_crop*255)
+                            cv2.imwrite("nxyz.png",nomal_img*255)
+                            # show_ims = [
+                            #     bgr_gl[:, :, [2, 1, 0]],
+                            #     # get_emb_show(xyz_np),
+                            #     get_emb_show(nomal_img),
+                            #     get_emb_show(nxyz_crop),
 
-                            ]
-                            show_titles = ["bgr_gl", "nxyz", "nxyz_crop"]
-                            grid_show(show_ims, show_titles, row=1, col=3)
+                            # ]
+                            # show_titles = ["bgr_gl", "nxyz", "nxyz_crop"]
+                            # grid_show(show_ims, show_titles, row=1, col=3)
                             break #跳过查看下一个类
+                    break #跳过查看下一个类
                     if not args.no_save:  # save file
                         mmcv.mkdir_or_exist(osp.dirname(nxyz_path))
                         mmcv.dump(nxyz_info, nxyz_path)
@@ -296,9 +316,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="gen lm train_pbr xyz")
     parser.add_argument("--split", type=str, default="train", help="split")
     parser.add_argument("--scene", type=str, default="all", help="scene id")
-    parser.add_argument("--vis", default=False,
+    parser.add_argument("--vis", default=True,
                         action="store_true", help="vis")
-    parser.add_argument("--no-save", default=False,
+    parser.add_argument("--no-save", default=True,
                         action="store_true", help="do not save results")
     args = parser.parse_args()
 
