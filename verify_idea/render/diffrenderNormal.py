@@ -110,7 +110,7 @@ class DiffRenderer_Normal_Wrapper(nn.Module):
             [[-1, 0, 0, 0],
              [0, -1, 0, 0],
              [0, 0, 1, 0],
-             [0, 0, 0, 1]], dtype=torch.float32,device="cuda:0"
+             [0, 0, 0, 1]], dtype=torch.float32,device=device
         )
 
     def forward(self, model_names,T, K, render_image_size, near=0.1, far=6, render_tex=False):
