@@ -232,8 +232,8 @@ class XyzGen(object):
 
         for scene in tqdm(self.scenes):
             scene_id = int(scene)
-            if scene_id>2:
-                break
+            if not 38<=scene_id<=50:
+                continue
             scene_root = osp.join(self.dataset_root, scene)
 
             gt_dict = mmcv.load(osp.join(scene_root, "scene_gt.json"))
@@ -241,7 +241,7 @@ class XyzGen(object):
             cam_dict = mmcv.load(osp.join(scene_root, "scene_camera.json"))
 
             for str_im_id in tqdm(gt_dict, postfix=f"{scene_id}"):
-                # str_im_id='58'
+                
                 int_im_id = int(str_im_id)
 
                 scene_im_id = f"{scene_id}/{int_im_id}"
@@ -263,7 +263,11 @@ class XyzGen(object):
                     xyz_path = osp.join(self.xyz_root, f"{scene_id:06d}/{int_im_id:06d}_{anno_i:06d}-xyz.pkl")
                     nxyz_path = osp.join(self.nxyz_root, f"{scene_id:06d}/{int_im_id:06d}_{anno_i:06d}-nxyz.pkl")
                     render_obj_id=id
-
+                    bbox_visib = gt_info_dict[str_im_id][anno_i]["bbox_visib"]
+                    x1, y1, w, h = bbox_visib
+                    if (h <= 1 or w <= 1) or osp.exists(nxyz_path):#存在的就不再渲染了
+                        continue
+                    
                 # t=np.array([0,0,4])  #  #固定平移
                     T=np.eye(4)
                     T[:3,:3]=R
@@ -279,8 +283,9 @@ class XyzGen(object):
                     # nomal_img=nomal_img[:,:,0]
                     mask1 = (nomal_img != np.array([0, 0, 0])).astype("uint8")
 
-                    if mask1.sum() <2000:
-                            # cv2.imwrite("nxyz_crop.png",nxyz_crop*255)
+                    if mask1.sum() ==0:
+                            # import cv2
+                            # # cv2.imwrite("nxyz_crop.png",nxyz_crop*255)
                             # cv2.imwrite("nxyz.png",nomal_img*255)
                             continue
                     else:
@@ -305,7 +310,7 @@ class XyzGen(object):
                             # ]
                             # show_titles = ["bgr_gl", "nxyz", "nxyz_crop"]
                             # grid_show(show_ims, show_titles, row=1, col=3)
-                            break #跳过查看下一个类
+                            # break #跳过查看下一个类
                     # break #跳过查看下一个类
                     if not args.no_save:  # save file
                         mmcv.mkdir_or_exist(osp.dirname(nxyz_path))
