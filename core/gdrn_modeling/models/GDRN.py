@@ -170,20 +170,20 @@ class GDRN(nn.Module):
 
             mask, coor_x, coor_y, coor_z, region,w3d,scale = self.rot_head_net(features)
             coor_feat = torch.cat([coor_x, coor_y, coor_z], dim=1)  # BCHW
-            w3d=torch.abs(w3d)
-            ma=gt_mask_visib<0.5
-            w3d.masked_fill_(ma,-1e7)
+            # w3d=torch.abs(w3d)
+            # ma=gt_mask_visib<0.5
+            # w3d.masked_fill_(ma,-1e7)
 
-            # for i in range(ma.shape[0]):
-            #     w3d[i:i+1,ma[i]]=w3d[i:i+1,ma[i]].softmax(1) 
+            # # for i in range(ma.shape[0]):
+            # #     w3d[i:i+1,ma[i]]=w3d[i:i+1,ma[i]].softmax(1) 
             w3d=w3d[:,None]
-            #将w3d化为想要的样子
-            w3d=w3d.reshape(w3d.shape[0],w3d.shape[1],-1)
-            w3d=w3d.softmax(2)
-            w3d=w3d*torch.sum(ma,dim=[1,2]).view([24,1,1])
-            scale=scale[...,None]
-            # w3d=w3d*scale
-            w3d=w3d.reshape(w3d.shape[0],w3d.shape[1],region.shape[2],region.shape[3])
+            # #将w3d化为想要的样子
+            # w3d=w3d.reshape(w3d.shape[0],w3d.shape[1],-1)
+            # w3d=w3d.softmax(2)
+            # w3d=w3d*torch.sum(ma,dim=[1,2]).view([24,1,1])
+            # scale=scale[...,None]
+            # # w3d=w3d*scale
+            # w3d=w3d.reshape(w3d.shape[0],w3d.shape[1],region.shape[2],region.shape[3])
             #归一化
             coor_feat=F.normalize(coor_feat,p=2,dim=1)
             coor_x=coor_feat[:,0,]
@@ -688,7 +688,7 @@ class GDRN(nn.Module):
                     # cv2.imwrite("origin_change.png",(gt_xyz1[i].cpu().numpy().transpose(1,2,0)+1)*255/2)
                     # cv2.imwrite("img1.png",(coor_feat[i].detach().cpu().numpy().transpose(1,2,0)+1)*255/2)
                     # cv2.imwrite("img2.png",(out_region[i].detach().cpu().numpy().transpose(1,2,0)+1)*255/2)
-                    cos_simi=F.cosine_similarity(gt_xyz,coor_feat2,dim=1)
+                    cos_simi=F.cosine_similarity(gt_xyz,coor_feat2,dim=1)#feat2为预测的物体坐标系下的法线在相机坐标系下的理想情况
                     valid_mask = gt_mask_xyz[:,:, :].float() \
                              * (cos_simi.detach() < 0.999).float() \
                              * (cos_simi.detach() > -0.999).float()
@@ -704,13 +704,40 @@ class GDRN(nn.Module):
                     # coor_2d1=coor_2d[gt_mask_xyz>0.5]
                     # ll=nn.MSELoss(reduction="mean")(coor_2d,coor_feat2)
                     loss_dict["R_loss_region"]=torch.mean(ll)
-                    
-                    # cos_simi=cos_simi.sum()/gt_mask_xyz.sum()#这样就比一大了
-                    # # cos_simi=cos_simi.sum()/gt_mask_xyz.sum().float().clamp(min=1.0)#这样就比一大了
-                    # if not -1<cos_simi<1:
-                    #     print(cos_simi)
-                    # cos_simi=cos_simi.arccos()
-                    # loss_dict["R_loss_region"]=cos_simi
+                    #加上cross 约束===========================
+                    cos_simi_gt=torch.cosine_similarity(coor_feat,coor_feat2,dim=1)
+                    valid_mask_gt = gt_mask_xyz[:, :, :].float() \
+                         * (cos_simi_gt.detach() < 0.999).float() \
+                         * (cos_simi_gt.detach() > -0.999).float()
+                    cos_ll_gt=cos_simi_gt[valid_mask_gt>0.5]
+                    cos_ll_gt=torch.acos(cos_ll_gt)
+                    cos_ll=cos_ll_gt
+                    loss_dict["cross_region"]=torch.mean(cos_ll)
+                    #加上w的权重学习
+                    w3d_select=w3d[:,0]
+                    w3d_select=w3d_select[valid_mask_gt>0.5]
+                    loss_dict["w3d"] = nn.L1Loss(reduction="mean")(w3d_select,torch.exp(-cos_ll_gt.detach()))
+                    #带权重的R的误差
+                    out_rot=torch.permute(out_rot,(0,1,2))
+                    out_rot_3d=torch.matmul(gl2cv,out_rot)
+                    out_rot_3d=out_rot_3d.view(coor_feat1.shape[0],1,1,3,3)
+                    coor_feat3=torch.matmul(out_rot_3d,coor_feat1.detach())#feat3为预测出来的region在相机坐标系下预测的xyz
+                    coor_feat3=coor_feat3.squeeze()
+                    coor_feat3= torch.permute(coor_feat3,(0,3,1,2))
+                    cos_simi_gt1=torch.cosine_similarity(coor_feat.detach(),coor_feat3,dim=1)
+                    valid_mask_gt1 = gt_mask_xyz[:, :, :].float() \
+                         * (cos_simi_gt1.detach() < 0.999).float() \
+                         * (cos_simi_gt1.detach() > -0.999).float()\
+                            * (cos_simi_gt.detach() < 0.999).float() \
+                         * (cos_simi_gt.detach() > -0.999).float()
+                    ll_preR=cos_simi_gt1[valid_mask_gt1>0.5]
+                    ll_preR=torch.acos(ll_preR)
+                    real_w=cos_simi_gt.detach()[valid_mask_gt1>0.5]
+                    real_w=torch.exp(-torch.acos(real_w))
+                    ll_preR=ll_preR*real_w
+                    loss_dict["pre_R"]=torch.mean(ll_preR)
+
+                   
             else:
                 raise NotImplementedError(f"unknown region loss type: {region_loss_type}")
                 
@@ -719,7 +746,7 @@ class GDRN(nn.Module):
         #Renderer(
             #     model_paths, vertex_tmp_store_folder=osp.join(PROJ_ROOT, ".cache")
             # )
-        if pnp_net_cfg.ENABLE and not pnp_net_cfg.FREEZE:
+        if pnp_net_cfg.ENABLE and not pnp_net_cfg.FREEZE and False:
             if pnp_net_cfg.PM_LW > 0:
                 
                 if pnp_net_cfg.PM_LOSS_TYPE=="normal_loss" and False:
