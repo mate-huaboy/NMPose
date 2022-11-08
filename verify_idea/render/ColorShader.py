@@ -1,3 +1,4 @@
+from email.mime import image
 import torch
 import torch.nn as nn
 from pytorch3d.renderer.blending import softmax_rgb_blend, BlendParams
@@ -121,5 +122,6 @@ class NormalShader(nn.Module):
             cameras=cameras,
             materials=materials,
         )
+        # images=colors
         images = softmax_rgb_blend(colors, fragments, blend_params)
         return images

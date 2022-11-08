@@ -182,8 +182,8 @@ class XyzGen(object):
         self.dataset_root = SPLITS_LM_PBR["lmo_pbr_train"].get("dataset_root", osp.join(DATASETS_ROOT, "BOP_DATASETS/lm/train_pbr"))
         self.xyz_root = SPLITS_LM_PBR["lmo_pbr_train"].get("xyz_root", osp.join(self.dataset_root, "xyz_crop"))
         self.nxyz_root = SPLITS_LM_PBR["lmo_pbr_train"].get("nxyz_root", osp.join(self.dataset_root, "nxyz_crop"))
-        # self.models_root =SPLITS_LM_PBR["lmo_pbr_train"]["models_root"]  # BOP_DATASETS/lm/models
-        self.models_root ="datasets/BOP_DATASETS/lm/models"  #修改一下
+        self.models_root =SPLITS_LM_PBR["lmo_pbr_train"]["models_root"]  # BOP_DATASETS/lm/models
+        # self.models_root ="datasets/BOP_DATASETS/lm/models"  #修改一下
 
         self.height = SPLITS_LM_PBR["lmo_pbr_train"]["height"]  # 480
         self.width = SPLITS_LM_PBR["lmo_pbr_train"]["width"]  # 640
@@ -231,7 +231,10 @@ class XyzGen(object):
     def main(self):
 
         for scene in tqdm(self.scenes):
+            scene='000001'
             scene_id = int(scene)
+            # if not 38<=scene_id<=50:
+            #     continue
             scene_root = osp.join(self.dataset_root, scene)
 
             gt_dict = mmcv.load(osp.join(scene_root, "scene_gt.json"))
@@ -239,7 +242,7 @@ class XyzGen(object):
             cam_dict = mmcv.load(osp.join(scene_root, "scene_camera.json"))
 
             for str_im_id in tqdm(gt_dict, postfix=f"{scene_id}"):
-                # str_im_id='58'
+                str_im_id ='952'
                 int_im_id = int(str_im_id)
 
                 scene_im_id = f"{scene_id}/{int_im_id}"
@@ -247,18 +250,25 @@ class XyzGen(object):
                 K = np.array(cam_dict[str_im_id]["cam_K"], dtype=np.float32).reshape(3, 3)
                 depth_factor = 1000.0 / cam_dict[str_im_id]["depth_scale"]  # 10000
                 insts = []
+                render_obj_id=[]
+              
                 for anno_i, anno in enumerate(gt_dict[str_im_id]):
+                    
                     obj_id = anno["obj_id"]
                     if obj_id not in self.cat_ids:
                         continue
                     id=self.cat_ids.index(obj_id)
                     R = np.array(anno["cam_R_m2c"], dtype="float32").reshape(3, 3)
-                    t = np.array(anno["cam_t_m2c"], dtype="float32") / 1000.0
+                    t = np.array(anno["cam_t_m2c"], dtype="float32") / 1000.0#3*1
 
                     xyz_path = osp.join(self.xyz_root, f"{scene_id:06d}/{int_im_id:06d}_{anno_i:06d}-xyz.pkl")
                     nxyz_path = osp.join(self.nxyz_root, f"{scene_id:06d}/{int_im_id:06d}_{anno_i:06d}-nxyz.pkl")
                     render_obj_id=id
-
+                    bbox_visib = gt_info_dict[str_im_id][anno_i]["bbox_visib"]
+                    x1, y1, w, h = bbox_visib
+                    if (h <= 1 or w <= 1) or osp.exists(nxyz_path):#存在的就不再渲染了
+                        continue
+                    
                 # t=np.array([0,0,4])  #  #固定平移
                     T=np.eye(4)
                     T[:3,:3]=R
@@ -271,9 +281,13 @@ class XyzGen(object):
                     nomal_img = self.get_renderer()([render_obj_id],T,K,(self.width,self.height),near,far)#如果固定t则如何呢
                     nomal_img=nomal_img.cpu().numpy()
                     nomal_img=nomal_img[0]
+                    # nomal_img=nomal_img[:,:,0]
                     mask1 = (nomal_img != np.array([0, 0, 0])).astype("uint8")
 
-                    if mask1.sum() == 0:
+                    if mask1.sum() ==0:
+                            # import cv2
+                            # # cv2.imwrite("nxyz_crop.png",nxyz_crop*255)
+                            # cv2.imwrite("nxyz.png",nomal_img*255)
                             continue
                     else:
                         x1, y1, x2, y2 = mask2bbox_xyxy(mask1)
@@ -297,13 +311,13 @@ class XyzGen(object):
                             # ]
                             # show_titles = ["bgr_gl", "nxyz", "nxyz_crop"]
                             # grid_show(show_ims, show_titles, row=1, col=3)
-                            break #跳过查看下一个类
-                    break #跳过查看下一个类
+                            # break #跳过查看下一个类
+                    # break #跳过查看下一个类
                     if not args.no_save:  # save file
                         mmcv.mkdir_or_exist(osp.dirname(nxyz_path))
                         mmcv.dump(nxyz_info, nxyz_path)
-        if self.renderer is not None:
-            self.renderer.close()
+        # if self.renderer is not None:
+        #     self.renderer.close()
 
 
 
