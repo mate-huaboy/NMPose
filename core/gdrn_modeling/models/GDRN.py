@@ -709,8 +709,8 @@ class GDRN(nn.Module):
                     valid_mask_gt = gt_mask_xyz[:, :, :].float() \
                          * (cos_simi_gt.detach() < 0.999).float() \
                          * (cos_simi_gt.detach() > -0.999).float()
-                    cos_ll_gt=cos_simi_gt[valid_mask_gt>0.5]
-                    cos_ll_gt=torch.acos(cos_ll_gt)
+                    # cos_ll_gt=cos_simi_gt[valid_mask_gt>0.5]
+                    cos_ll_gt=torch.acos(cos_simi_gt[valid_mask_gt>0.5])
                     cos_ll=cos_ll_gt
                     loss_dict["cross_region"]=torch.mean(cos_ll)
                     #加上w的权重学习
@@ -732,10 +732,38 @@ class GDRN(nn.Module):
                          * (cos_simi_gt.detach() > -0.999).float()
                     ll_preR=cos_simi_gt1[valid_mask_gt1>0.5]
                     ll_preR=torch.acos(ll_preR)
-                    real_w=cos_simi_gt.detach()[valid_mask_gt1>0.5]
-                    real_w=torch.exp(-torch.acos(real_w))
-                    ll_preR=ll_preR*real_w
+                    # real_w=cos_simi_gt.detach()[valid_mask_gt1>0.5]
+                    # real_w=torch.exp(-torch.acos(real_w))
+                    # ll_preR=ll_preR*real_w
+                    w3d_select=w3d[:,0].detach()
+                    pre_w=w3d_select[valid_mask_gt1>0.5]
+                    ll_preR=ll_preR*pre_w
                     loss_dict["pre_R"]=torch.mean(ll_preR)
+                    #加上PM——R稳定训练
+                    assert (gt_points is not None) and (gt_trans is not None) and (gt_rot is not None)
+                    loss_func = PyPMLoss(#看这里的误差计算,融合预测旋转和平移是还包括了平移在3d点上的 误差评估？
+                        loss_type="L1",
+                        beta=pnp_net_cfg.PM_SMOOTH_L1_BETA,
+                        reduction="mean",
+                        loss_weight=pnp_net_cfg.PM_LW,
+                        norm_by_extent=pnp_net_cfg.PM_NORM_BY_EXTENT,
+                        symmetric=pnp_net_cfg.PM_LOSS_SYM,
+                        disentangle_t=pnp_net_cfg.PM_DISENTANGLE_T,
+                        disentangle_z=pnp_net_cfg.PM_DISENTANGLE_Z,
+                        t_loss_use_points=pnp_net_cfg.PM_T_USE_POINTS,
+                        r_only=pnp_net_cfg.PM_R_ONLY,
+                    )
+                    loss_pm_dict = loss_func(
+                        pred_rots=out_rot,
+                        gt_rots=gt_rot,
+                        points=gt_points,
+                        pred_transes=out_trans,
+                        gt_transes=gt_trans,
+                        extents=extents,
+                        sym_infos=sym_infos,
+                    )
+                    loss_dict.update(loss_pm_dict)#向字典中加入字典
+
 
                    
             else:
