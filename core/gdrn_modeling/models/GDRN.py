@@ -473,12 +473,24 @@ class GDRN(nn.Module):
                 # R_matrix=np.matmul(R_matrix,gl2cv)
                 R_matrix=np.matmul(gl2cv,R_matrix)
 
-                R_matrix=torch.tensor([R_matrix],device='cuda:0')
-                #===========================
-                out_dict = {"rot": R_matrix, "trans": pred_trans} #return real pose,为什么平移的结果受旋转的结果的影响呢
-            else:
-                out_dict = {"rot": pred_ego_rot, "trans": pred_trans} #return real pose,为什么平移的结果受旋转的结果的影响呢
-            #可视化=============
+            # R_matrix=torch.tensor([R_matrix],device='cuda:0')
+             #===================================
+            #使用umeyama算法
+            coor_cam=coor_feat.transpose(1,0)[:,gt_mask_visib>0.5]
+            coor_obj=region.transpose(1,0)[:,gt_mask_visib>0.5]
+            from lib.utils.umeyama import umeyama
+            coor_cam=coor_cam.detach().cpu().numpy()
+            coor_obj=coor_obj.detach().cpu().numpy()
+            c,R,t=umeyama(coor_obj,coor_cam)
+            gl2cv=np.array([[-1.0,0,0],[0,-1.0,0],[0,0,1]],dtype=np.float32)
+            R_matrix=np.matmul(gl2cv,R)
+            R_matrix=torch.tensor([R_matrix],device='cuda:0')
+            #======================================
+            #===========================
+            out_dict = {"rot": R_matrix, "trans": pred_trans} #return real pose,为什么平移的结果受旋转的结果的影响呢
+
+            # out_dict = {"rot": pred_ego_rot, "trans": pred_trans} #return real pose,为什么平移的结果受旋转的结果的影响呢
+             #可视化=============
              # cv2.imwrite("ori_img.png",x[0,:3].detach().cpu().numpy().transpose(1,2,0)*255)
             mask1=mask<0.5#bcwh
             mask1=mask1.transpose(1,0)#cbwh
@@ -500,7 +512,6 @@ class GDRN(nn.Module):
             cv2.imwrite("region.png",region[0].detach().cpu().numpy().transpose(1,2,0)*255)
             cv2.imwrite("mask.png",mask[0].detach().cpu().numpy().transpose(1,2,0)*255)
             cv2.imwrite("w3d.png",w3d[0].detach().cpu().numpy().transpose(1,2,0)*255)
-            #===================
             if cfg.TEST.USE_PNP:
                 # TODO: move the pnp/ransac inside forward
                 out_dict.update({"mask": mask, "coor_x": coor_x, "coor_y": coor_y, "coor_z": coor_z, "region": region,"w3d":w3d})
@@ -655,8 +666,8 @@ class GDRN(nn.Module):
                 # coor_feat=F.normalize(coor_feat,p=2,dim=1)
                 cos_simi=F.cosine_similarity(coor_feat,gt_xyz,dim=1)
                 valid_mask = gt_mask_xyz[:, :, :].float() \
-                         * (cos_simi.detach() < 1).float() \
-                         * (cos_simi.detach() > -1).float()
+                         * (cos_simi.detach() < 0.999).float() \
+                         * (cos_simi.detach() > -0.999).float()
                 cos_simi=cos_simi[valid_mask>0.5]
                 ll=torch.acos(cos_simi)
                 loss_dict["loss_coor"]=torch.mean(ll)
@@ -712,99 +723,65 @@ class GDRN(nn.Module):
                     coor_feat2=torch.matmul(gt_rot_t,coor_feat1)
                     coor_feat2=coor_feat2.squeeze()
                     coor_feat2= torch.permute(coor_feat2,(0,3,1,2))
-                        # i=(roi_classes==7).nonzero().cpu().numpy()
-                        # i =int(i[0]) if not len(i)==0 else 0 
-                        # gt_xyz1=torch.permute(gt_xyz,(0,3,2,1))
-                        # gt_xyz1=gt_xyz1[...,None]
-                        # gt_xyz1=torch.matmul(gt_rot_t,gt_xyz1)
-                        # gt_xyz1=gt_xyz1.squeeze()
-                        # gt_xyz1= torch.permute(gt_xyz1,(0,3,1,2))
-                        # cv2.imwrite("origin_change.png",(gt_xyz1[i].cpu().numpy().transpose(1,2,0)+1)*255/2)
-                        # cv2.imwrite("img1.png",(coor_feat[i].detach().cpu().numpy().transpose(1,2,0)+1)*255/2)
-                        # cv2.imwrite("img2.png",(out_region[i].detach().cpu().numpy().transpose(1,2,0)+1)*255/2)
-                    if rasio>0:
-                        cos_simi=F.cosine_similarity(gt_xyz,coor_feat2,dim=1)#feat2为预测的物体坐标系下的法线在相机坐标系下的理想情况
-                        valid_mask = gt_mask_xyz[:,:, :].float() \
-                                * (cos_simi.detach() < 1).float() \
-                                * (cos_simi.detach() > -1).float()
-                        cos_simi=cos_simi[valid_mask>0.5]
-                        ll=torch.acos(cos_simi)
-                        # coor_feat2=coor_feat2[gt_mask_xyz>0.5]
-                        # coor_feat2=coor_feat2[:,:2]/(coor_feat2[:,2:]+1)
-                        # coor_feat2=coor_feat2[:,:2]
-                        # coor_2d=coor_feat.permute((0,2,3,1))
-                        # coor_2d=coor_2d[gt_mask_xyz>0.5]
-                        # coor_2d=coor_2d[...,:2]/(coor_2d[...,2:]+1)
-                        # coor_2d=coor_2d[...,:2]
-                        # coor_2d1=coor_2d[gt_mask_xyz>0.5]
-                        # ll=nn.MSELoss(reduction="mean")(coor_2d,coor_feat2)
-                        loss_dict["R_loss_region"]=torch.mean(ll)
+                    # i=(roi_classes==7).nonzero().cpu().numpy()
+                    # i =int(i[0]) if not len(i)==0 else 0 
+                    # gt_xyz1=torch.permute(gt_xyz,(0,3,2,1))
+                    # gt_xyz1=gt_xyz1[...,None]
+                    # gt_xyz1=torch.matmul(gt_rot_t,gt_xyz1)
+                    # gt_xyz1=gt_xyz1.squeeze()
+                    # gt_xyz1= torch.permute(gt_xyz1,(0,3,1,2))
+                    # cv2.imwrite("origin_change.png",(gt_xyz1[i].cpu().numpy().transpose(1,2,0)+1)*255/2)
+                    # cv2.imwrite("img1.png",(coor_feat[i].detach().cpu().numpy().transpose(1,2,0)+1)*255/2)
+                    # cv2.imwrite("img2.png",(out_region[i].detach().cpu().numpy().transpose(1,2,0)+1)*255/2)
+                    cos_simi=F.cosine_similarity(gt_xyz,coor_feat2,dim=1)#feat2为预测的物体坐标系下的法线在相机坐标系下的理想情况
+                    valid_mask = gt_mask_xyz[:,:, :].float() \
+                             * (cos_simi.detach() < 0.999).float() \
+                             * (cos_simi.detach() > -0.999).float()
+                    cos_simi=cos_simi[valid_mask>0.5]
+                    ll=torch.acos(cos_simi)
+                    # coor_feat2=coor_feat2[gt_mask_xyz>0.5]
+                    # coor_feat2=coor_feat2[:,:2]/(coor_feat2[:,2:]+1)
+                    # coor_feat2=coor_feat2[:,:2]
+                    # coor_2d=coor_feat.permute((0,2,3,1))
+                    # coor_2d=coor_2d[gt_mask_xyz>0.5]
+                    # coor_2d=coor_2d[...,:2]/(coor_2d[...,2:]+1)
+                    # coor_2d=coor_2d[...,:2]
+                    # coor_2d1=coor_2d[gt_mask_xyz>0.5]
+                    # ll=nn.MSELoss(reduction="mean")(coor_2d,coor_feat2)
+                    loss_dict["R_loss_region"]=torch.mean(ll)
                     #加上cross 约束===========================
                     
                     cos_simi_gt=torch.cosine_similarity(coor_feat,coor_feat2,dim=1)
                     valid_mask_gt = gt_mask_xyz[:, :, :].float() \
-                        * (cos_simi_gt.detach() < 1).float() \
-                        * (cos_simi_gt.detach() > -1).float()
-                    # cos_ll_gt=cos_simi_gt[valid_mask_gt>0.5]
-                    
-                    cos_ll_gt=torch.acos(cos_simi_gt[valid_mask_gt>0.5])
-                    if rasio>0:
-                        cos_ll=cos_ll_gt
-                        loss_dict["cross_region"]=torch.mean(cos_ll)
+                         * (cos_simi_gt.detach() < 0.999).float() \
+                         * (cos_simi_gt.detach() > -0.999).float()
+                    cos_ll_gt=cos_simi_gt[valid_mask_gt>0.5]
+                    cos_ll_gt=torch.acos(cos_ll_gt)
+                    cos_ll=cos_ll_gt
+                    loss_dict["cross_region"]=torch.mean(cos_ll)
                     #加上w的权重学习
-                    if rasio>0:
-                        w3d_select=w3d[:,0]
-                        w3d_select=w3d_select[valid_mask_gt>0.5]
-                        loss_dict["w3d"] = nn.L1Loss(reduction="mean")(w3d_select,torch.exp(-cos_ll_gt.detach()))
+                    w3d_select=w3d[:,0]
+                    w3d_select=w3d_select[valid_mask_gt>0.5]
+                    loss_dict["w3d"] = nn.L1Loss(reduction="mean")(w3d_select,torch.exp(-cos_ll_gt.detach()))
                     #带权重的R的误差
-                    if rasio>0:
-                        out_rot=torch.permute(out_rot,(0,1,2))
-                        out_rot_3d=torch.matmul(gl2cv,out_rot)
-                        out_rot_3d=out_rot_3d.view(coor_feat1.shape[0],1,1,3,3)
-                        coor_feat3=torch.matmul(out_rot_3d,coor_feat1.detach())#feat3为预测出来的region在相机坐标系下预测的xyz
-                        coor_feat3=coor_feat3.squeeze()
-                        coor_feat3= torch.permute(coor_feat3,(0,3,1,2))
-                        cos_simi_gt1=torch.cosine_similarity(coor_feat.detach(),coor_feat3,dim=1)
-                        valid_mask_gt1 = gt_mask_xyz[:, :, :].float() \
-                            * (cos_simi_gt1.detach() < 1).float() \
-                            * (cos_simi_gt1.detach() > -1).float()\
-                                * (cos_simi_gt.detach() < 1).float() \
-                            * (cos_simi_gt.detach() > -1).float()
-                        ll_preR=cos_simi_gt1[valid_mask_gt1>0.5]
-                        ll_preR=torch.acos(ll_preR)
-                        real_w=cos_simi_gt.detach()[valid_mask_gt1>0.5]
-                        real_w=torch.exp(-torch.acos(real_w))
-                        ll_preR=ll_preR*real_w
-                        # w3d_select=w3d[:,0].detach()
-                        # pre_w=w3d_select[valid_mask_gt1>0.5]
-                        # ll_preR=ll_preR*pre_w
-                        loss_dict["pre_R"]=torch.mean(ll_preR)
-                    # 加上PM——R稳定训练
-                    if rasio>60:
-                        assert (gt_points is not None) and (gt_trans is not None) and (gt_rot is not None)
-                        loss_func = PyPMLoss(#看这里的误差计算,融合预测旋转和平移是还包括了平移在3d点上的 误差评估？
-                            loss_type="L1",
-                            beta=pnp_net_cfg.PM_SMOOTH_L1_BETA,
-                            reduction="mean",
-                            loss_weight=pnp_net_cfg.PM_LW,
-                            norm_by_extent=pnp_net_cfg.PM_NORM_BY_EXTENT,
-                            symmetric=pnp_net_cfg.PM_LOSS_SYM,
-                            disentangle_t=pnp_net_cfg.PM_DISENTANGLE_T,
-                            disentangle_z=pnp_net_cfg.PM_DISENTANGLE_Z,
-                            t_loss_use_points=pnp_net_cfg.PM_T_USE_POINTS,
-                            r_only=pnp_net_cfg.PM_R_ONLY,
-                        )
-                        loss_pm_dict = loss_func(
-                            pred_rots=out_rot,
-                            gt_rots=gt_rot,
-                            points=gt_points,
-                            pred_transes=out_trans,
-                            gt_transes=gt_trans,
-                            extents=extents,
-                            sym_infos=sym_infos,
-                        )
-                        loss_dict.update(loss_pm_dict)#向字典中加入字典
-
+                    out_rot=torch.permute(out_rot,(0,1,2))
+                    out_rot_3d=torch.matmul(gl2cv,out_rot)
+                    out_rot_3d=out_rot_3d.view(coor_feat1.shape[0],1,1,3,3)
+                    coor_feat3=torch.matmul(out_rot_3d,coor_feat1.detach())#feat3为预测出来的region在相机坐标系下预测的xyz
+                    coor_feat3=coor_feat3.squeeze()
+                    coor_feat3= torch.permute(coor_feat3,(0,3,1,2))
+                    cos_simi_gt1=torch.cosine_similarity(coor_feat.detach(),coor_feat3,dim=1)
+                    valid_mask_gt1 = gt_mask_xyz[:, :, :].float() \
+                         * (cos_simi_gt1.detach() < 0.999).float() \
+                         * (cos_simi_gt1.detach() > -0.999).float()\
+                            * (cos_simi_gt.detach() < 0.999).float() \
+                         * (cos_simi_gt.detach() > -0.999).float()
+                    ll_preR=cos_simi_gt1[valid_mask_gt1>0.5]
+                    ll_preR=torch.acos(ll_preR)
+                    real_w=cos_simi_gt.detach()[valid_mask_gt1>0.5]
+                    real_w=torch.exp(-torch.acos(real_w))
+                    ll_preR=ll_preR*real_w
+                    loss_dict["pre_R"]=torch.mean(ll_preR)
 
                    
             else:
