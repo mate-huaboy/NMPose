@@ -1,11 +1,11 @@
 _base_ = ["config_base.py"]
-OUTPUT_DIR = "output32/gdrn/lm/a6_cPnP_lm13"#改变一下输出路径以同时跑两个
+OUTPUT_DIR = "outputtest1/gdrn/lm/a6_cPnP_lm13"#改变一下输出路径以同时跑两个
 INPUT = dict(
   DZI_SCALE_RATIO=0.15,
  DZI_SHIFT_RATIO=0.1,
 )
 SOLVER = dict(
-    TOTAL_EPOCHS=60,
+    TOTAL_EPOCHS=200,
     ANNEAL_POINT=0.72,# 修改之前是0.72
     OPTIMIZER_CFG=dict(_delete_=True, type="Ranger", lr=1e-4, weight_decay=0),#修改一下学习率
 )
@@ -16,6 +16,7 @@ MODEL = dict(
         BACKBONE=dict( FREEZE=False,
          ENABLED=True,
          INPUT_RES=256,
+          INPUT_CHANNEL=5,
             OUTPUT_RES=64) ,#同时不训练
         ROT_HEAD=dict(
             ENABLED=True,#去掉旋转tou
@@ -32,7 +33,7 @@ MODEL = dict(
             CENTER_TRANS=False,
             WITH_2D_COORD=False,#加上这个2d对应
             ROT_TYPE="allo_rot6d",
-            TRUE_NORMAL=True,
+            TRUE_NORMAL=False,
             PM_LOSS_TYPE='Rot_cos_loss',#"Rot_cos_loss"|L1,
             NUM_LAYERS=4,
             MASK_ATTENTION='none',

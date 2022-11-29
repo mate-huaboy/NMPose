@@ -193,13 +193,14 @@ class RotWithRegionHead(nn.Module):
                     xyz = x[:, self.mask_output_dim : self.mask_output_dim + self.rot_output_dim, :, :]
                     
                     region = x[:, self.mask_output_dim + self.rot_output_dim :, :, :]
-                    region,w3d=region.split([3,1],dim=1)
+                    w3d=region[:,-1,:,:]
+                    region=region[:,:3,:,:]
                     bs, c, h, w = xyz.shape
                     xyz = xyz.view(bs, 3, self.rot_output_dim // 3, h, w)
                     coor_x = xyz[:, 0, :, :, :]
                     coor_y = xyz[:, 1, :, :, :]
                     coor_z = xyz[:, 2, :, :, :]
-                    return (mask.detach(), coor_x.detach(), coor_y.detach(), coor_z.detach(), region.detach(),w3d.detach(),scale.datech())
+                    return (mask.detach(), coor_x.detach(), coor_y.detach(), coor_z.detach(), region.detach(),w3d.detach(),scale.detach())
             else:
                 for i, l in enumerate(self.features):
                     x = l(x)

@@ -288,6 +288,7 @@ class GDRN_Lite(LightningLite):
                     roi_coord_2d=batch.get("roi_coord_2d", None),
                     roi_extents=batch.get("roi_extent", None),
                     do_loss=True,
+                    rasio=iteration/max_iter*100,
                 )
                 losses = sum(loss_dict.values())
                 assert torch.isfinite(losses).all(), loss_dict

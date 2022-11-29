@@ -44,7 +44,7 @@ w = 640
 
 # Load mesh
 device = torch.device("cuda:0")
-mesh = IO().load_mesh("datasets/BOP_DATASETS/lm/models/obj_000011.ply").to(device)
+mesh = IO().load_mesh("datasets/BOP_DATASETS/lm/models/obj_000009.ply").to(device)
 mesh.scale_verts_(0.001)
 # mesh.scale_verts_(1)
 
@@ -148,9 +148,9 @@ rasterizer=PointsRasterizer(cameras=camera,raster_settings=raster_settings)
 #     ),
 # )
 raster_settings = PointsRasterizationSettings(
-    image_size=512, 
-    radius = 0.003,
-    points_per_pixel = 10
+    image_size=256, 
+    radius = 0.01,
+    points_per_pixel = 3
 )
 
 
@@ -173,7 +173,7 @@ nv1=R1.view(3,3).t().view(1,3,3)@mesh_nv[...,None]
 nv1.squeeze_()
 # nv1=nv1[None]
 # points=Pointclouds(points=l,features=[mesh.verts_normals_list()[0]])
-points=Pointclouds(points=l,features=[nv])
+points=Pointclouds(points=[nv],features=l)
 imge=renderer(points)
 img = imge[0, ..., :3]
 img=img.cpu().numpy()

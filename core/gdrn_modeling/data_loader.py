@@ -313,6 +313,7 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
         dataset_name = dataset_dict["dataset_name"]
 
         image = read_image_cv2(dataset_dict["file_name"], format=self.img_format)
+        cv2.imwrite("origin_big.png",image)
         # should be consistent with the size in dataset_dict
         utils.check_image_size(dataset_dict, image)
         im_H_ori, im_W_ori = image.shape[:2]
@@ -462,9 +463,8 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
                 #鸡蛋盒的平移效果在linemod-O上的效果特别差，这里查看一下原始的测试图片
                 #仅仅需要查看鸡蛋盒的检测效果--
                 #
-                if inst_i==5:
-                    cv2.imwrite("roi_img.png",roi_img.transpose(1,2,0))# it's bounding box is very bad
                 
+                cv2.imwrite("roi_img.png",roi_img.transpose(1,2,0))# it's bounding box is very bad      
                 roi_img = self.normalize_image(cfg, roi_img)  #图片也要归一化
                 roi_infos["roi_img"].append(roi_img.astype("float32"))
 
@@ -482,6 +482,7 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
                 ).transpose(
                     2, 0, 1
                 )  # HWC -> CHW
+                # cv2.imwrite("coor_2d.png",roi_coord_2d.transpose(1,2,0)*255)
                 roi_infos["roi_coord_2d"].append(roi_coord_2d.astype("float32"))
 
                 if pnp_net_cfg.TRUE_NORMAL:
