@@ -139,8 +139,8 @@ def pose_from_predictions_test(
                 else:
                     cur_ego_mat = pred_rots[i]
                 ego_rot_preds[i] = cur_ego_mat
-        else:
-            ego_rot_preds=np.array([])
+    else:
+        ego_rot_preds=np.array([])
     return torch.from_numpy(ego_rot_preds), translation
 
 

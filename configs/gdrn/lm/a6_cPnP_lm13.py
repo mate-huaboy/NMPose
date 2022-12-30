@@ -1,5 +1,5 @@
 _base_ = ["config_base.py"]
-OUTPUT_DIR = "outputtest1/gdrn/lm/a6_cPnP_lm13"#改变一下输出路径以同时跑两个
+OUTPUT_DIR = "output14/gdrn/lm/a6_cPnP_lm13"#改变一下输出路径以同时跑两个
 INPUT = dict(
   DZI_SCALE_RATIO=0.15,
  DZI_SHIFT_RATIO=0.1,

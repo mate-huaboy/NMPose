@@ -146,7 +146,7 @@ class LM_PBR_Dataset:
                     bbox_obj = gt_info_dict[str_im_id][anno_i]["bbox_obj"]
                     x1, y1, w, h = bbox_visib
                     if self.filter_invalid:
-                        if h <= 1 or w <= 1:
+                        if h <= 5 or w <= 5:
                             self.num_instances_without_valid_box += 1
                             continue
 
@@ -157,7 +157,7 @@ class LM_PBR_Dataset:
                     # load mask visib  TODO: load both mask_visib and mask_full
                     mask_single = mmcv.imread(mask_visib_file, "unchanged")
                     area = mask_single.sum()
-                    if area < 3:  # filter out too small or nearly invisible instances
+                    if area < 25:  # filter out too small or nearly invisible instances
                         self.num_instances_without_valid_segmentation += 1
                         continue
 
@@ -167,8 +167,10 @@ class LM_PBR_Dataset:
 
                     xyz_path = osp.join(self.xyz_root, f"{scene_id:06d}/{int_im_id:06d}_{anno_i:06d}-xyz.pkl")
                     nxyz_path = osp.join(self.nxyz_root, f"{scene_id:06d}/{int_im_id:06d}_{anno_i:06d}-nxyz.pkl")
-
-                    assert osp.exists(nxyz_path), nxyz_path
+                    #如果不存在则应该去掉当前的
+                    if not os.path.exists(nxyz_path):
+                        continue
+                    # assert osp.exists(nxyz_path), nxyz_path
                     inst = {
                         "category_id": cur_label,  # 0-based label
                         "bbox": bbox_visib,  # TODO: load both bbox_obj and bbox_visib

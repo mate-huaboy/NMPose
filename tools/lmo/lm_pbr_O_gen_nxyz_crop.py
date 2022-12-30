@@ -231,7 +231,7 @@ class XyzGen(object):
     def main(self):
 
         for scene in tqdm(self.scenes):
-            scene='000001'
+            # scene='000001'
             scene_id = int(scene)
             # if not 38<=scene_id<=50:
             #     continue
@@ -242,7 +242,7 @@ class XyzGen(object):
             cam_dict = mmcv.load(osp.join(scene_root, "scene_camera.json"))
 
             for str_im_id in tqdm(gt_dict, postfix=f"{scene_id}"):
-                str_im_id ='952'
+                # str_im_id ='952'
                 int_im_id = int(str_im_id)
 
                 scene_im_id = f"{scene_id}/{int_im_id}"
@@ -330,9 +330,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="gen lm train_pbr xyz")
     parser.add_argument("--split", type=str, default="train", help="split")
     parser.add_argument("--scene", type=str, default="all", help="scene id")
-    parser.add_argument("--vis", default=True,
+    parser.add_argument("--vis", default=False,
                         action="store_true", help="vis")
-    parser.add_argument("--no-save", default=True,
+    parser.add_argument("--no-save", default=False,
                         action="store_true", help="do not save results")
     args = parser.parse_args()
 

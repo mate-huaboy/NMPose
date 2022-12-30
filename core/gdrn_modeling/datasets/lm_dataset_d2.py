@@ -159,7 +159,7 @@ class LM_Dataset(object):
                     bbox_obj = gt_info_dict[str_im_id][anno_i]["bbox_obj"]#最后也加上score
                     x1, y1, w, h = bbox_visib
                     if self.filter_invalid:
-                        if h <= 1 or w <= 1:
+                        if h <= 5 or w <= 5:#之前是1
                             self.num_instances_without_valid_box += 1
                             continue
 
@@ -170,7 +170,7 @@ class LM_Dataset(object):
                     # load mask visib  TODO: load both mask_visib and mask_full
                     mask_single = mmcv.imread(mask_visib_file, "unchanged")
                     area = mask_single.sum()
-                    if area < 3:  # filter out too small or nearly invisible instances
+                    if area < 20:  # filter out too small or nearly invisible instances
                         self.num_instances_without_valid_segmentation += 1
                         continue
                     mask_rle = binary_mask_to_rle(mask_single, compressed=True)
@@ -186,13 +186,13 @@ class LM_Dataset(object):
                         "segmentation": mask_rle,
                         "mask_full_file": mask_file,  # TODO: load as mask_full, rle
                     }
-                    if ("test" not in self.name) or True:  # only when train can get xyz因为需要测试直接去掉旋转头的情况，所以add True to get xyz,修改
+                    if ("test" not in self.name):  # only when train can get xyz因为需要测试直接去掉旋转头的情况，所以add True to get xyz,修改
                     # if ("test" not in self.name): # only when train can get xyz因为需要测试直接去掉旋转头的情况，所以add True to get xyz,修改
 
                         xyz_path = osp.join(xyz_root, f"{int_im_id:06d}_{anno_i:06d}.pkl")
                         nxyz_path=osp.join(nxyz_root, f"{int_im_id:06d}_{anno_i:06d}-nxyz.pkl")
-                        assert osp.exists(xyz_path), xyz_path
-                        inst["xyz_path"] = xyz_path
+                        # assert osp.exists(xyz_path), xyz_path
+                        # inst["xyz_path"] = xyz_path
 
                         assert osp.exists(nxyz_path), nxyz_path
                         inst["nxyz_path"] = nxyz_path
