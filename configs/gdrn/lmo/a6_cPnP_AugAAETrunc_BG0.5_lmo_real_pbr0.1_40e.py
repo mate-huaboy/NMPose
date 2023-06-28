@@ -1,6 +1,6 @@
 _base_ = ["../../_base_/gdrn_base.py"]
 
-OUTPUT_DIR = "output2/gdrn/lmo/a6_cPnP_AugAAETrunc_BG0.5_lmo_real_pbr0.1_40e"
+OUTPUT_DIR = "output39/gdrn/lmo/a6_cPnP_AugAAETrunc_BG0.5_lmo_real_pbr0.1_40e"
 INPUT = dict(
     DZI_PAD_SCALE=1.5,
       DZI_SCALE_RATIO=0.15,
@@ -26,9 +26,14 @@ INPUT = dict(
     ),
 )
 
+VAL = dict(
+    ERROR_TYPES='mssd',
+    RENDERER_TYPE='cpp',#cpp
+    USE_BOP=False)
+
 SOLVER = dict(
     IMS_PER_BATCH=24,
-    TOTAL_EPOCHS=60,#原来是40
+    TOTAL_EPOCHS=100,#原来是40,原来自己的设置是60
     LR_SCHEDULER_NAME="flat_and_anneal",
     ANNEAL_METHOD="cosine",  # "cosine"
     ANNEAL_POINT=0.72,
@@ -41,8 +46,8 @@ SOLVER = dict(
 
 DATASETS = dict(
     TRAIN=("lmo_train",),
-    TRAIN2=("lmo_pbr_train",),
-    TRAIN2_RATIO=0.1,
+    # TRAIN2=("lmo_pbr_train",),
+    # TRAIN2_RATIO=0.1,
     TEST=("lmo_test",),
 
     # TRAIN=("train",),
@@ -87,8 +92,8 @@ MODEL = dict(
 
         ),
         PNP_NET=dict(
-            FREEZE=True,
-            ENABLE=False,
+            FREEZE=False,
+            ENABLE=True,
             R_ONLY=True,
             # REGION_ATTENTION=True,改
              NUM_LAYERS=4,

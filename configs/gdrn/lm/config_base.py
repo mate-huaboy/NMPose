@@ -66,9 +66,9 @@ SOLVER = dict(
     ANNEAL_POINT=0.6,
     POLY_POWER=0.9,
     REL_STEPS=(0.5, 0.75),
-    CHECKPOINT_PERIOD=5,
+    CHECKPOINT_PERIOD=5,#每多少个epcho保存一个checkpoint，原来是5
     CHECKPOINT_BY_EPOCH=True,
-    MAX_TO_KEEP=5,
+    MAX_TO_KEEP=5,#保留中间结果的最大
     AMP=dict(ENABLED=False),
     WEIGHT_DECAY=0,
     OPTIMIZER_NAME='Ranger',

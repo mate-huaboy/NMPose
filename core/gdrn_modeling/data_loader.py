@@ -443,8 +443,8 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
                 if pnp_net_cfg.R_ONLY:#
                     roi_infos["bbox_center"].append(bbox_center.astype("float32"))
                     roi_infos["scale"].append(scale)
-                    roi_infos["roi_wh"].append(np.array([scale, scale], dtype=np.float32))
-                    # roi_infos["roi_wh"].append(np.array([bw, bh], dtype=np.float32))
+                    # roi_infos["roi_wh"].append(np.array([scale, scale], dtype=np.float32))
+                    roi_infos["roi_wh"].append(np.array([bw, bh], dtype=np.float32))
                     roi_infos["resize_ratio"].append(input_res / scale)
                 else:
                     roi_infos["bbox_center"].append(bbox_center.astype("float32"))
@@ -774,14 +774,14 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
             dataset_dict["bbox_center"] = torch.as_tensor(bbox_center, dtype=torch.float32)
             dataset_dict["scale"] = scale
             dataset_dict["bbox"] = anno["bbox"]  # NOTE: original bbox
-            # dataset_dict["roi_wh"] = torch.as_tensor(np.array([bw, bh], dtype=np.float32))
-            dataset_dict["roi_wh"] = torch.as_tensor(np.array([scale, scale], dtype=np.float32))
+            dataset_dict["roi_wh"] = torch.as_tensor(np.array([bw, bh], dtype=np.float32))
+            # dataset_dict["roi_wh"] = torch.as_tensor(np.array([scale, scale], dtype=np.float32))
             dataset_dict["resize_ratio"] = resize_ratio = input_res / scale
             z_ratio = inst_infos["trans"][2] / resize_ratio
             obj_center = anno["centroid_2d"]
             delta_c = obj_center - bbox_center
-            # dataset_dict["trans_ratio"] = torch.as_tensor([delta_c[0] / bw, delta_c[1] / bh, z_ratio]).to(torch.float32)
-            dataset_dict["trans_ratio"] = torch.as_tensor([delta_c[0] / scale, delta_c[1] / scale, z_ratio]).to(torch.float32)
+            dataset_dict["trans_ratio"] = torch.as_tensor([delta_c[0] / bw, delta_c[1] / bh, z_ratio]).to(torch.float32)
+            # dataset_dict["trans_ratio"] = torch.as_tensor([delta_c[0] / scale, delta_c[1] / scale, z_ratio]).to(torch.float32)
         else: 
              
             dataset_dict["bbox_center"] = torch.as_tensor(bbox_center, dtype=torch.float32)

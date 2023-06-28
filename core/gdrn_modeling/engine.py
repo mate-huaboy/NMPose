@@ -211,7 +211,7 @@ class GDRN_Lite(LightningLite):
         # 如果是最新的训练则从0开始
         start_iter=0
         if cfg.SOLVER.CHECKPOINT_BY_EPOCH:
-            ckpt_period = cfg.SOLVER.CHECKPOINT_PERIOD * iters_per_epoch
+            ckpt_period = cfg.SOLVER.CHECKPOINT_PERIOD * iters_per_epoch*100#这里本来没有100的
         else:
             ckpt_period = cfg.SOLVER.CHECKPOINT_PERIOD
         periodic_checkpointer = PeriodicCheckpointer(
@@ -361,7 +361,7 @@ class GDRN_Lite(LightningLite):
                             gt_mask_vis = batch["roi_mask_visib"][vis_i].detach().cpu().numpy()
                             tbx_writer.add_image("gt_mask", gt_mask_vis, iteration,dataformats='HW')
 
-                if (iteration + 1) % periodic_checkpointer.period == 0 or (
+                if ((iteration + 1) % periodic_checkpointer.period == 0 ) or (
                     periodic_checkpointer.max_iter is not None and (iteration + 1) >= periodic_checkpointer.max_iter
                 ):
                     if hasattr(optimizer, "consolidate_state_dict"):  # for ddp_sharded

@@ -339,8 +339,10 @@ class GDRN(nn.Module):
         mask_atten = None
         if pnp_net_cfg.MASK_ATTENTION != "none":
             mask_atten = get_mask_prob(cfg, mask)
-
-        region_atten =torch.cat([region,w3d],dim=1)
+        if r_head_cfg.NUM_REGIONS>2:
+            region_atten =torch.cat([region,w3d],dim=1)#拥有atteion
+        else:
+            region_atten=region
         # if pnp_net_cfg.REGION_ATTENTION:
         #     region_atten = region_softmax
 
@@ -478,31 +480,30 @@ class GDRN(nn.Module):
             #     R_matrix=torch.tensor([R_matrix],device='cuda:0')
             #     R_matrix_list.append(R_matrix)
             # R_matrix=torch.cat(R_matrix_list,dim=0)
-            # R_matrix=torch.tensor([R_matrix],device='cuda:0')
             #  #===================================
             #使用umeyama算法 
-            R_matrix_list=[]
-            from lib.utils.umeyama import umeyama
-            for i in range(coor_feat.shape[0]):
-                mask1=mask.transpose(1,0)[0,i]>0.5#bwh
-                coor_cam=coor_feat.transpose(1,0)[:,i,mask1]
-                coor_obj=region.transpose(1,0)[:,i,mask1]
-                if coor_cam.shape[1]>3:
-                    coor_cam=coor_cam.detach().cpu().numpy()
-                    coor_obj=coor_obj.detach().cpu().numpy()
-                    c,R,t=umeyama(coor_obj,coor_cam)
-                    gl2cv=np.array([[-1.0,0,0],[0,-1.0,0],[0,0,1]],dtype=np.float32)
-                    R_matrix=np.matmul(gl2cv,R)
-                else:
-                    R_matrix=np.array([1,0,0,0,1,0,0,0,1]).reshape(3,3)
-                R_matrix=torch.tensor([R_matrix],device='cuda:0')
-                R_matrix_list.append(R_matrix)
-            R_matrix=torch.cat(R_matrix_list,dim=0)
+            # R_matrix_list=[]
+            # from lib.utils.umeyama import umeyama
+            # for i in range(coor_feat.shape[0]):
+            #     mask1=mask.transpose(1,0)[0,i]>0.5#bwh
+            #     coor_cam=coor_feat.transpose(1,0)[:,i,mask1]
+            #     coor_obj=region.transpose(1,0)[:,i,mask1]
+            #     if coor_cam.shape[1]>3:
+            #         coor_cam=coor_cam.detach().cpu().numpy()
+            #         coor_obj=coor_obj.detach().cpu().numpy()
+            #         c,R,t=umeyama(coor_obj,coor_cam)
+            #         gl2cv=np.array([[-1.0,0,0],[0,-1.0,0],[0,0,1]],dtype=np.float32)
+            #         R_matrix=np.matmul(gl2cv,R)
+            #     else:
+            #         R_matrix=np.array([1,0,0,0,1,0,0,0,1]).reshape(3,3)
+            #     R_matrix=torch.tensor([R_matrix],device='cuda:0')
+            #     R_matrix_list.append(R_matrix)
+            # R_matrix=torch.cat(R_matrix_list,dim=0)
             #======================================
             #===========================
-            out_dict = {"rot": R_matrix, "trans": pred_trans} #return real pose,为什么平移的结果受旋转的结果的影响呢
+            # out_dict = {"rot": R_matrix, "trans": pred_trans} #return real pose,为什么平移的结果受旋转的结果的影响呢
 
-            # out_dict = {"rot": pred_ego_rot, "trans": pred_trans} #return real pose,为什么平移的结果受旋转的结果的影响呢
+            out_dict = {"rot": pred_ego_rot, "trans": pred_trans} #return real pose,为什么平移的结果受旋转的结果的影响呢
              #可视化=============
             #  # cv2.imwrite("ori_img.png",x[0,:3].detach().cpu().numpy().transpose(1,2,0)*255)
             # mask1=mask<0.5#bcwh
@@ -772,16 +773,17 @@ class GDRN(nn.Module):
                     # cos_ll_gt=cos_simi_gt[valid_mask_gt>0.5]
                     
                     cos_ll_gt=torch.acos(cos_simi_gt[valid_mask_gt>0.5])
-                    if rasio>0:
+                    #cross的损失
+                    if rasio>10:
                         cos_ll=cos_ll_gt
                         loss_dict["cross_region"]=torch.mean(cos_ll)
                     #加上w的权重学习
-                    if rasio>100:
+                    if rasio>0:
                         w3d_select=w3d[:,0]
                         w3d_select=w3d_select[valid_mask_gt>0.5]
                         loss_dict["w3d"] = nn.L1Loss(reduction="mean")(w3d_select,torch.exp(-cos_ll_gt.detach()))
                     #带权重的R的误差
-                    if rasio>100:
+                    if rasio>0:
                         out_rot=torch.permute(out_rot,(0,1,2))
                         out_rot_3d=torch.matmul(gl2cv,out_rot)
                         out_rot_3d=out_rot_3d.view(coor_feat1.shape[0],1,1,3,3)
@@ -804,7 +806,7 @@ class GDRN(nn.Module):
                         # ll_preR=ll_preR*pre_w
                         loss_dict["pre_R"]=torch.mean(ll_preR)
                     # 加上PM——R稳定训练
-                    if rasio>170:
+                    if rasio>70:
                         assert (gt_points is not None) and (gt_trans is not None) and (gt_rot is not None)
                         loss_func = PyPMLoss(#看这里的误差计算,融合预测旋转和平移是还包括了平移在3d点上的 误差评估？
                             loss_type="L1",

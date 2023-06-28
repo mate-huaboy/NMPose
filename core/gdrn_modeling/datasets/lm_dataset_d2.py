@@ -752,8 +752,8 @@ if __name__ == "__main__":
 
     print("sys.argv:", sys.argv)
     setup_logger()
-    register_with_name_cfg(sys.argv[1])
-    # register_with_name_cfg("lm_13_train")
+    # register_with_name_cfg(sys.argv[1])
+    register_with_name_cfg("lm_13_train")
 
     print("dataset catalog: ", DatasetCatalog.list())
 
