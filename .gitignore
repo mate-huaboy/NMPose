@@ -20,7 +20,7 @@ nohup.out
 *.jpg
 *.png
 *.txt
-
+/
 # compilation and distribution
 __pycache__
 _ext
@@ -53,3 +53,5 @@ dist/
 
 # project dirs
 /models
+/lib/egl_renderer
+/lib/meshrenderer
