@@ -1,16 +1,15 @@
-# GDR-Net
+# NMPose
 This repo provides the PyTorch implementation of the work:
 
-**Gu Wang, Fabian Manhardt, Federico Tombari, Xiangyang Ji. GDR-Net: Geometry-Guided Direct Regression Network for Monocular 6D Object Pose Estimation. In CVPR 2021.**
-[[Paper](https://openaccess.thecvf.com/content/CVPR2021/html/Wang_GDR-Net_Geometry-Guided_Direct_Regression_Network_for_Monocular_6D_Object_Pose_CVPR_2021_paper.html)][[ArXiv](http://arxiv.org/abs/2102.12145)][[Video](https://www.bilibili.com/video/BV1dU4y1G7Ku?share_source=copy_web)][[bibtex](#Citation)]
+
 
 
 ## News
-* [2021/08] An extension of this work, [SO-Pose](https://arxiv.org/abs/2108.08367) by Di et al. (ICCV 2021), has been released ([SO-Pose code](https://github.com/shangbuhuan13/SO-Pose), [mirror](https://github.com/THU-DA-6D-Pose-Group/SO-Pose)).
+
 
 ## Overview
 <p align="center">
-<img src='assets/gdrn_architecture.png' width='800'>
+<img src='assets/overview.png' width='800'>
 <p>
 
 
@@ -50,7 +49,7 @@ datasets/
 * `lm_renders_blender` comes from [pvnet-rendering](https://github.com/zju3dv/pvnet-rendering), note that we do not need the fused data.
 
 
-## Training GDR-Net
+## Training NMPose
 `./core/gdrn_modeling/train_gdrn.sh <config_path> <gpu_ids> (other args)`
 
 Example:
@@ -60,8 +59,7 @@ Example:
 ```
 
 
-Our trained GDR-Net models can be found here ([BaiduNetDisk](https://pan.baidu.com/s/1_MEZJBd67hdxcE8JzmnOtA), [OneDrive](https://1drv.ms/u/s!Ah83ZdJvIaBnnj88MpeoTjXtge8R?e=hzjxLE), password: kedv). <br />
-<sub><sup>(Note that the models for BOP setup in the supplement were trained using a refactored version of this repo (not compatible), they are slightly better than the models provided here.)</sup></sub>
+Our trained NMPose models can be found here ([BaiduNetDisk](https://pan.baidu.com/s/1_MEZJBd67hdxcE8JzmnOtA)). 
 
 
 ## Evaluation
@@ -72,16 +70,8 @@ Example:
 ./core/gdrn_modeling/test_gdrn.sh configs/gdrn/lmo/a6_cPnP_AugAAETrunc_BG0.5_lmo_real_pbr0.1_40e.py 0 output/gdrn/lmo/a6_cPnP_AugAAETrunc_BG0.5_lmo_real_pbr0.1_40e/gdrn_lmo_real_pbr.pth
 ```
 
-
+## Acknowledgment
+This work can not be finished well without the following reference, many thanks for the author's contribution:
+[CDPN](https://github.com/LZGMatrix/CDPN_ICCV2019_ZhigangLi), [GDR-Net](https://github.com/THU-DA-6D-Pose-Group/GDR-Net)
 ## Citation
-If you find this useful in your research, please consider citing:
-```
-@InProceedings{Wang_2021_GDRN,
-    title     = {{GDR-Net}: Geometry-Guided Direct Regression Network for Monocular 6D Object Pose Estimation},
-    author    = {Wang, Gu and Manhardt, Fabian and Tombari, Federico and Ji, Xiangyang},
-    booktitle = {IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
-    month     = {June},
-    year      = {2021},
-    pages     = {16611-16621}
-}
-```
+
