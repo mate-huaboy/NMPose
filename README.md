@@ -59,7 +59,7 @@ Example:
 ```
 
 
-Our trained NMPose models can be found here ([BaiduNetDisk](https://pan.baidu.com/s/1_MEZJBd67hdxcE8JzmnOtA)). 
+Our trained NMPose models can be found here ([BaiduNetDisk](https://pan.baidu.com/s/1hXNSRio6bR1XFik0VBs63A?pwd=flx3),password:flx3). 
 
 
 ## Evaluation

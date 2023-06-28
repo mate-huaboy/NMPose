@@ -18,7 +18,7 @@ mesa_18.3.3-0.deb.1
 nohup.out
 *.ttf
 *.jpg
-*.png
+# *.png
 *.txt
 /
 # compilation and distribution
