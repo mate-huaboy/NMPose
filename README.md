@@ -1,5 +1,5 @@
 # NMPose
-This repo provides the PyTorch implementation of the work:
+This repo provides the PyTorch implementation of the work. Some code comments still need to be organized
 
 
 
