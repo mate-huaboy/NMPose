@@ -389,6 +389,10 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
                 roi_keys.append("roi_nxyz")
                 roi_infos["roi_mask_visib"]=[]
                 roi_keys.append("roi_mask_visib")
+            roi_infos["bbox3d_and_center"]=[]
+            roi_keys.append("bbox3d_and_center")
+            roi_infos["pose"]=[]
+            roi_keys.append("pose")
 
             # yapf: enable
             # TODO: how to handle image without detections
@@ -408,6 +412,9 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
 
                 roi_cls = inst_infos["category_id"]
                 roi_infos["roi_cls"].append(roi_cls)
+                if "bbox3d_and_center" in inst_infos:
+                    roi_infos["bbox3d_and_center"].append(inst_infos["bbox3d_and_center"])
+                    roi_infos["pose"].append(inst_infos["pose"])
                 if not test_bbox_type == "gt":
                     roi_infos["score"].append(inst_infos["score"])  #去掉分数又如何，这里需要修改=====
                 else:
@@ -517,7 +524,7 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
             for _key in roi_keys:
                 if _key in ["roi_img", "roi_coord_2d","roi_nxyz","roi_mask_visib"]:
                     dataset_dict[_key] = torch.as_tensor(np.array(roi_infos[_key])).contiguous()
-                elif _key in ["model_info", "scene_im_id", "file_name"]:
+                elif _key in ["model_info", "scene_im_id", "file_name","bbox3d_and_center","pose"]:
                     # can not convert to tensor
                     dataset_dict[_key] = roi_infos[_key]
                 else:

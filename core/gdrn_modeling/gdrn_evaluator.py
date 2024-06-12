@@ -595,6 +595,26 @@ def gdrn_inference_on_dataset(cfg, model, data_loader, evaluator, amp_test=False
             outputs = [{} for _ in range(len(inputs))]
             for _i in range(len(outputs)):
                 outputs[_i]["time"] = cur_compute_time
+            #可视化=======================
+            temp=inputs[0]
+            if "bbox3d_and_center" in temp and False:
+                from core.utils.data_utils import read_image_cv2
+                img=read_image_cv2(inputs[0]["file_name"][0], format="BGR")
+                # img_vis_kpts2d=img.copy()
+                for i in range(len(temp["bbox3d_and_center"])):
+                    from lib.pysixd import misc
+                    kpts_3d_list = inputs[0]["bbox3d_and_center"][i]
+                    R=np.array(inputs[0]["pose"][i][:3,:3])
+                    t=np.array(inputs[0]["pose"][i][:3,-1])
+                    kpts_2d = misc.project_pts(kpts_3d_list,inputs[0]["cam"].detach().cpu().numpy()[0], R, t)
+                    #画真值
+                    import cv2
+                    img_vis_kpts2d = misc.draw_projected_box3d(img.copy(), kpts_2d,(255, 0, 0),(255, 0, 0),(255, 0, 0))#蓝色是真值
+                    # cv2.imwrite("vis/img_kpts2d1.png",img_vis_kpts2d)
+                    kpts_2d_pre=misc.project_pts(kpts_3d_list, inputs[0]["cam"].detach().cpu().numpy()[0], out_dict['rot'][i].detach().cpu().numpy(), out_dict['trans'][i].detach().cpu().numpy())
+                    img_vis_kpts2d= misc.draw_projected_box3d(img_vis_kpts2d.copy(), kpts_2d_pre,(0, 0, 255),(0, 0, 255),(0, 0, 255))
+                    cv2.imwrite(f"vis/img_kpts2d2{idx}_{i}.png",img_vis_kpts2d)
+                
 
             start_process_time = time.perf_counter()
             evaluator.process(inputs, outputs, out_dict)  # RANSAC/PnP

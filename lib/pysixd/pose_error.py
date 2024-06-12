@@ -446,7 +446,6 @@ def re_rad_train(R_est, R_gt):
     """
     assert R_est.shape == R_gt.shape == (3, 3)
     rotation_diff = R_est@R_gt.t()
-    # trace = np.trace(rotation_diff)
     trace = rotation_diff.trace()
    
     trace = trace if trace <= 3 else 3#不知道为什么可以这样评估旋转误差--好像不行，哎
