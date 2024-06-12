@@ -178,6 +178,9 @@ def load_detections_into_dataset(
                 temp=record["annotations"][len(annotations)]
                 nxyz=temp["nxyz_path"]
                 sel_annos[0]["nxyz_path"]=nxyz
+                sel_annos[0]["bbox3d_and_center"]=temp["bbox3d_and_center"]#加上3d box for vis
+                sel_annos[0]["pose"]=temp["pose"]
+                #在加上pose
           
             #===================
             annotations.extend(sel_annos)

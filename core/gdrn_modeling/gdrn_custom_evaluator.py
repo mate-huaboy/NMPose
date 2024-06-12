@@ -590,6 +590,7 @@ class GDRN_EvaluatorCustom(DatasetEvaluator):
                 errors[obj_name]["te"].append(t_error)
                 errors[obj_name]["proj"].append(proj_2d_error)
                 ############
+                
                 recalls[obj_name]["ad_2"].append(float(ad_error < 0.02 * self.diameters[cur_label]))
                 recalls[obj_name]["ad_5"].append(float(ad_error < 0.05 * self.diameters[cur_label]))
                 recalls[obj_name]["ad_10"].append(float(ad_error < 0.1 * self.diameters[cur_label]))

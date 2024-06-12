@@ -682,7 +682,10 @@ def test_vis():
             img_vis = vis_image_mask_bbox_cv2(
                 img, masks[_i : _i + 1], bboxes=bboxes_xyxy[_i : _i + 1], labels=labels[_i : _i + 1]
             )
-            img_vis_kpts2d = misc.draw_projected_box3d(img_vis.copy(), kpts_2d[_i])
+            # draw_projected_box3d(image, qs, color=(255, 0, 255), middle_color=None, bottom_color=None, thickness=2)
+            img_vis_kpts2d = misc.draw_projected_box3d(img_vis.copy(), kpts_2d[_i],(255, 0, 255),(255, 0, 255),(255, 0, 255))
+            import cv2
+            cv2.imwrite("img_kpts2d.png",img_vis_kpts2d)
             if "test" not in dset_name:
                 xyz_path = annos[_i]["xyz_path"]
                 xyz_info = mmcv.load(xyz_path)

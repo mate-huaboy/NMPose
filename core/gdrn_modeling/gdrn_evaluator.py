@@ -595,7 +595,22 @@ def gdrn_inference_on_dataset(cfg, model, data_loader, evaluator, amp_test=False
             outputs = [{} for _ in range(len(inputs))]
             for _i in range(len(outputs)):
                 outputs[_i]["time"] = cur_compute_time
-
+            #可视化==========
+            # from lib.pysixd import misc
+            # from core.utils.data_utils import read_image_cv2
+            # img=read_image_cv2(inputs[0]["file_name"][0], format="BGR")
+            # kpts_3d_list = inputs[0]["bbox3d_and_center"][0]
+            # R=np.array(inputs[0]["pose"][0][:3,:3])
+            # t=np.array(inputs[0]["pose"][0][:3,-1])
+            # kpts_2d = misc.project_pts(kpts_3d_list,inputs[0]["cam"].detach().cpu().numpy()[0], R, t)
+            # #画真值
+            # import cv2
+            # img_vis_kpts2d = misc.draw_projected_box3d(img.copy(), kpts_2d,(255, 0, 0),(255, 0, 0),(255, 0, 0))
+            # cv2.imwrite("img_kpts2d1.png",img_vis_kpts2d)
+            # kpts_2d_pre=misc.project_pts(kpts_3d_list, inputs[0]["cam"].detach().cpu().numpy()[0], out_dict['rot'][0].detach().cpu().numpy(), out_dict['trans'][0].detach().cpu().numpy())
+            # img_vis_kpts2d= misc.draw_projected_box3d(img_vis_kpts2d.copy(), kpts_2d_pre,(0, 0, 255),(0, 0, 255),(0, 0, 255))
+            # cv2.imwrite("img_kpts2d2.png",img_vis_kpts2d)
+            
             start_process_time = time.perf_counter()
             evaluator.process(inputs, outputs, out_dict)  # RANSAC/PnP
             cur_process_time = time.perf_counter() - start_process_time
@@ -673,7 +688,7 @@ def save_result_of_dataset(cfg, model, data_loader, output_dir, dataset_name):
 
     total = len(data_loader)  # inference data loader must have a fixed length
     results = OrderedDict()
-    VIS = False     #这是个啥，修改，原来是false
+    VIS = True     #这是个啥，修改，原来是false
 
     logging_interval = 50
     num_warmup = min(5, logging_interval - 1, total - 1)

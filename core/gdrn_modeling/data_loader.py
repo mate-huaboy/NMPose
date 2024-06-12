@@ -313,6 +313,7 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
         dataset_name = dataset_dict["dataset_name"]
 
         image = read_image_cv2(dataset_dict["file_name"], format=self.img_format)
+        cv2.imwrite("origin_big.png",image)
         # should be consistent with the size in dataset_dict
         utils.check_image_size(dataset_dict, image)
         im_H_ori, im_W_ori = image.shape[:2]
@@ -388,6 +389,10 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
                 roi_keys.append("roi_nxyz")
                 roi_infos["roi_mask_visib"]=[]
                 roi_keys.append("roi_mask_visib")
+                roi_infos["bbox3d_and_center"]=[]
+                roi_keys.append("bbox3d_and_center")
+                roi_infos["pose"]=[]
+                roi_keys.append("pose")
 
             # yapf: enable
             # TODO: how to handle image without detections
@@ -400,13 +405,15 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
                 roi_infos["im_H"].append(im_H)
                 roi_infos["im_W"].append(im_W)
                 roi_infos["cam"].append(dataset_dict["cam"].cpu().numpy())
-
+                
                 # roi-level infos
                 roi_infos["inst_id"].append(inst_i)
                 roi_infos["model_info"].append(inst_infos["model_info"])
 
                 roi_cls = inst_infos["category_id"]
                 roi_infos["roi_cls"].append(roi_cls)
+                roi_infos["bbox3d_and_center"].append(inst_infos["bbox3d_and_center"])
+                roi_infos["pose"].append(inst_infos["pose"])
                 if not test_bbox_type == "gt":
                     roi_infos["score"].append(inst_infos["score"])  #去掉分数又如何，这里需要修改=====
                 else:
@@ -443,6 +450,7 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
                     roi_infos["bbox_center"].append(bbox_center.astype("float32"))
                     roi_infos["scale"].append(scale)
                     roi_infos["roi_wh"].append(np.array([scale, scale], dtype=np.float32))
+                    # roi_infos["roi_wh"].append(np.array([bw, bh], dtype=np.float32))
                     roi_infos["resize_ratio"].append(input_res / scale)
                 else:
                     roi_infos["bbox_center"].append(bbox_center.astype("float32"))
@@ -462,8 +470,8 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
                 #鸡蛋盒的平移效果在linemod-O上的效果特别差，这里查看一下原始的测试图片
                 #仅仅需要查看鸡蛋盒的检测效果--
                 #
-                if inst_i==5:
-                    cv2.imwrite("roi_img.png",roi_img.transpose(1,2,0))# it's bounding box is very bad
+                # if inst_i==9 or True:
+                #     cv2.imwrite("roi_img.png",roi_img.transpose(1,2,0))# it's bounding box is very bad
                 
                 roi_img = self.normalize_image(cfg, roi_img)  #图片也要归一化
                 roi_infos["roi_img"].append(roi_img.astype("float32"))
@@ -482,6 +490,8 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
                 ).transpose(
                     2, 0, 1
                 )  # HWC -> CHW
+                # cv2.imwrite("coor_2d_0.png",roi_coord_2d.transpose(1,2,0)[...,0]*255)
+                # cv2.imwrite("coor_2d_1.png",roi_coord_2d.transpose(1,2,0)[...,1]*255)
                 roi_infos["roi_coord_2d"].append(roi_coord_2d.astype("float32"))
 
                 if pnp_net_cfg.TRUE_NORMAL:
@@ -515,7 +525,7 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
             for _key in roi_keys:
                 if _key in ["roi_img", "roi_coord_2d","roi_nxyz","roi_mask_visib"]:
                     dataset_dict[_key] = torch.as_tensor(np.array(roi_infos[_key])).contiguous()
-                elif _key in ["model_info", "scene_im_id", "file_name"]:
+                elif _key in ["model_info", "scene_im_id", "file_name","bbox3d_and_center","pose"]:
                     # can not convert to tensor
                     dataset_dict[_key] = roi_infos[_key]
                 else:
@@ -594,13 +604,6 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
         bh = max(bbox_xyxy[3] - bbox_xyxy[1], 1)
 
         #使用本身中心以及测试的比例来训练试一试================
-        bbox_center1 = np.array([0.5 * (x1 + x2), 0.5 * (y1 + y2)])
-        bw1 = max(x2 - x1, 1)
-        bh1 = max(y2 - y1, 1)
-        scale1 = max(bh1, bw1) * cfg.INPUT.DZI_PAD_SCALE
-        scale1 = min(scale1, max(im_H, im_W)) * 1.0#好像在截图的时候并没有考虑到边界框超出图像范围的情况
-        # bbox_center=bbox_center1
-
         # CHW, float32 tensor
         ## roi_image ------------------------------------
         roi_img = crop_resize_by_warp_affine( #by wenhua maybe a resize func,在训练时，使用的物体中心认为是物体在图像中的中心,will change after
@@ -770,14 +773,17 @@ class GDRN_DatasetFromList(Base_DatasetFromList):  #our dataset loader use class
             dataset_dict["bbox_center"] = torch.as_tensor(bbox_center, dtype=torch.float32)
             dataset_dict["scale"] = scale
             dataset_dict["bbox"] = anno["bbox"]  # NOTE: original bbox
+            # dataset_dict["roi_wh"] = torch.as_tensor(np.array([bw, bh], dtype=np.float32))
             dataset_dict["roi_wh"] = torch.as_tensor(np.array([scale, scale], dtype=np.float32))
             dataset_dict["resize_ratio"] = resize_ratio = input_res / scale
             z_ratio = inst_infos["trans"][2] / resize_ratio
             obj_center = anno["centroid_2d"]
             delta_c = obj_center - bbox_center
+            # dataset_dict["trans_ratio"] = torch.as_tensor([delta_c[0] / bw, delta_c[1] / bh, z_ratio]).to(torch.float32)
             dataset_dict["trans_ratio"] = torch.as_tensor([delta_c[0] / scale, delta_c[1] / scale, z_ratio]).to(torch.float32)
-        else: 
-             
+
+
+        else:   
             dataset_dict["bbox_center"] = torch.as_tensor(bbox_center, dtype=torch.float32)
             dataset_dict["scale"] = scale
             dataset_dict["bbox"] = anno["bbox"]  # NOTE: original bbox
