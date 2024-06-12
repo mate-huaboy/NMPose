@@ -29,7 +29,7 @@ _ext
 detectron2.egg-info/
 build/
 dist/
-
+*.png
 # pytorch/python/numpy formats
 *.pth
 *.pkl
