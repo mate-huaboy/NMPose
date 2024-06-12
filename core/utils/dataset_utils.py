@@ -176,10 +176,19 @@ def load_detections_into_dataset(
             #自己加---为测试集加上nxyz的路径====可能有错
             if len(annotations)<len(record["annotations"]) and sel_annos!=[]:
                 temp=record["annotations"][len(annotations)]
+<<<<<<< HEAD
                 # nxyz=temp["nxyz_path"]
                 # sel_annos[0]["nxyz_path"]=nxyz
                 sel_annos[0]["bbox3d_and_center"]=temp["bbox3d_and_center"]#加上3d box for vis
                 sel_annos[0]["pose"]=temp["pose"]
+=======
+                nxyz=temp["nxyz_path"]
+                sel_annos[0]["nxyz_path"]=nxyz
+                sel_annos[0]["bbox3d_and_center"]=temp["bbox3d_and_center"]#加上3d box for vis
+                sel_annos[0]["pose"]=temp["pose"]
+                #在加上pose
+          
+>>>>>>> atention
             #===================
             annotations.extend(sel_annos)
         # NOTE: maybe [], no detections

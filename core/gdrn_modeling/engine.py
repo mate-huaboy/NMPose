@@ -36,7 +36,7 @@ from core.utils.utils import get_emb_show
 from core.utils.data_utils import denormalize_image
 from .data_loader import build_gdrn_train_loader, build_gdrn_test_loader
 from .engine_utils import batch_data, get_out_coor, get_out_mask
-from .gdrn_evaluator import gdrn_inference_on_dataset, GDRN_Evaluator
+from .gdrn_evaluator import gdrn_inference_on_dataset, GDRN_Evaluator,save_result_of_dataset
 from .gdrn_custom_evaluator import GDRN_EvaluatorCustom
 import ref
 
@@ -134,6 +134,7 @@ class GDRN_Lite(LightningLite):
                 )
             data_loader = build_gdrn_test_loader(cfg, dataset_name, train_objs=evaluator.train_objs)
             data_loader = self.setup_dataloaders(data_loader, replace_sampler=False, move_to_device=False)
+            # save_result_of_dataset(cfg, model, data_loader, "output_dir", dataset_name)
             results_i = gdrn_inference_on_dataset(cfg, model, data_loader, evaluator, amp_test=cfg.TEST.AMP_TEST)
             results[dataset_name] = results_i
 
@@ -211,7 +212,11 @@ class GDRN_Lite(LightningLite):
         # 如果是最新的训练则从0开始
         start_iter=0
         if cfg.SOLVER.CHECKPOINT_BY_EPOCH:
+<<<<<<< HEAD
             ckpt_period = cfg.SOLVER.CHECKPOINT_PERIOD * iters_per_epoch*100#这里本来没有100的
+=======
+            ckpt_period = cfg.SOLVER.CHECKPOINT_PERIOD * iters_per_epoch*100
+>>>>>>> atention
         else:
             ckpt_period = cfg.SOLVER.CHECKPOINT_PERIOD
         periodic_checkpointer = PeriodicCheckpointer(
@@ -288,7 +293,11 @@ class GDRN_Lite(LightningLite):
                     roi_coord_2d=batch.get("roi_coord_2d", None),
                     roi_extents=batch.get("roi_extent", None),
                     do_loss=True,
+<<<<<<< HEAD
                     rasio=iteration/max_iter*100,
+=======
+                    rasio=iteration/max_iter*100
+>>>>>>> atention
                 )
                 losses = sum(loss_dict.values())
                 assert torch.isfinite(losses).all(), loss_dict
