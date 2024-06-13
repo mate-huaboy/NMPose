@@ -111,8 +111,8 @@ class GDRN(nn.Module):
         x,#IS image
         gt_xyz=None,
         gt_xyz_bin=None,
-        gt_mask_trunc=None,  #这些mask有什么区别呢
-        gt_mask_visib=None,
+        gt_mask_trunc=None,  #真值mask
+        gt_mask_visib=None,#真值可见mask
         gt_mask_obj=None,
         gt_region=None,
         gt_allo_quat=None,
@@ -129,7 +129,7 @@ class GDRN(nn.Module):
         roi_cams=None,
         roi_centers=None,
         roi_whs=None,
-        roi_extents=None,  #这是什么东西
+        roi_extents=None,  
         resize_ratios=None,
         do_loss=False,
         rasio=0,
@@ -142,6 +142,7 @@ class GDRN(nn.Module):
         
         #add channels
         if cfg.MODEL.CDPN.BACKBONE.ENABLED:
+            #将coord_2d作为输入的一部分
             if cfg.MODEL.CDPN.BACKBONE.INPUT_CHANNEL==5:
                 x=torch.cat([x,roi_coord_2d],dim=1)
             # x.shape [bs, 3, 256, 256]
@@ -223,7 +224,7 @@ class GDRN(nn.Module):
 
         #移动到中心
         #需要已知原来的缩放比例，现在的中心，以及现在的深度，使用的插值方法等
-        #now 这个过程可以反向传播，如有需要的话,首先先不考虑法线中心的反向传播吧，怕被影响
+        #now 这个过程可以反向传播，如有需要的话,首先先不考虑法线中心的反向传播，怕被影响
                 # pred_trans_temp,cent_temp = trans_from_pred_centroid_z(
                 #     pred_centroids=pred_t_only[:, :2],
                 #     pred_z_vals=pred_t_only[:, 2:3],  # must be [B, 1]
@@ -449,8 +450,8 @@ class GDRN(nn.Module):
             pred_ego_rot=pred_ego_rot.view(1,3,3)
             pred_ego_rot=pred_ego_rot.repeat(24,1,1)
 
-        if not do_loss:  # test
-             # use ransacpnp 
+        if not do_loss:  # test，使用三种方法恢复旋转
+             # use ransacpnp =====================
             # R_matrix_list=[]
             # coor_feat=coor_feat.transpose(1,0)#cbwh
             # region=region.transpose(1,0)
@@ -481,7 +482,7 @@ class GDRN(nn.Module):
             #     R_matrix_list.append(R_matrix)
             # R_matrix=torch.cat(R_matrix_list,dim=0)
             #  #===================================
-            #使用umeyama算法 
+            #使用umeyama算法 =================
             # R_matrix_list=[]
             # from lib.utils.umeyama import umeyama
             # for i in range(coor_feat.shape[0]):
@@ -529,7 +530,7 @@ class GDRN(nn.Module):
             if cfg.TEST.USE_PNP:
                 # TODO: move the pnp/ransac inside forward
                 out_dict.update({"mask": mask, "coor_x": coor_x, "coor_y": coor_y, "coor_z": coor_z, "region": region,"w3d":w3d})
-        else:
+        else:#train
             out_dict = {}
             assert (
                 (gt_xyz is not None)
@@ -560,7 +561,7 @@ class GDRN(nn.Module):
                 "vis/ty_rel_gt": gt_trans_ratio[0, 1].detach().item(),
                 "vis/tz_rel_gt": gt_trans_ratio[0, 2].detach().item(),
             }
-
+            #计算loss
             loss_dict = self.gdrn_loss(
                 cfg=self.cfg,
                 out_mask=mask,
@@ -644,7 +645,7 @@ class GDRN(nn.Module):
 
         # rot nxyz loss ----------------------------------
         #直接改变输入
-        #这里的xyz是nxyz
+        #这里的xyz是nxyz，即法线坐标
         #求余弦相似度的相反数的和作为损失函数
         coor_feat = torch.cat([out_x, out_y, out_z], dim=1)
         gt_mask_xyz = gt_masks[r_head_cfg.XYZ_LOSS_MASK_GT]#visib
